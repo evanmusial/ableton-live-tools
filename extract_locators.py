@@ -20,6 +20,12 @@ Version 2026.05 notes:
 
 Extract Ableton Live locator markers from an .als file and write them to a TSV.
 
+Timing note:
+  - Locator times are calculated against Ableton tempo changes and linear tempo
+    ramps, so exported timestamps follow the actual session timeline.
+  - User offsets are applied after locator normalization, which keeps offset
+    behavior predictable even when a set begins somewhere after bar 1.
+
 Features:
   - Handles both plain XML .als files and gzip-compressed .als files.
   - Reads tempo automation, including linear tempo ramps.
