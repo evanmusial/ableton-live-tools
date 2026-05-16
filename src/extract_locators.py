@@ -43,25 +43,25 @@ Arguments:
       Path to the Ableton .als file.
 
       Example:
-        python3 extract_locators.py path/to/song.als
+        python3 src/extract_locators.py path/to/song.als
 
   --add-offset=SECONDS
       Add SECONDS to every locator after normalization.
       Fractional and negative values are accepted.
 
       Examples:
-        python3 extract_locators.py song.als --add-offset=27
-        python3 extract_locators.py song.als --add-offset=27.5
-        python3 extract_locators.py song.als --add-offset=-3.25
+        python3 src/extract_locators.py song.als --add-offset=27
+        python3 src/extract_locators.py song.als --add-offset=27.5
+        python3 src/extract_locators.py song.als --add-offset=-3.25
 
   --precision=DECIMALS
       Number of decimal places to show in the seconds portion of each timestamp.
       Default: 0
 
       Examples:
-        python3 extract_locators.py song.als --precision=0
-        python3 extract_locators.py song.als --precision=1
-        python3 extract_locators.py song.als --precision=3
+        python3 src/extract_locators.py song.als --precision=0
+        python3 src/extract_locators.py song.als --precision=1
+        python3 src/extract_locators.py song.als --precision=3
 
       Example output with --precision=0:
         01:28
@@ -86,7 +86,7 @@ Arguments:
         Jack Trades & Kadiri - Can You Be
 
       Example:
-        python3 extract_locators.py song.als --strip-keys
+        python3 src/extract_locators.py song.als --strip-keys
 
   --output=PATH
   -o PATH
@@ -94,30 +94,30 @@ Arguments:
       Default: <input filename>.txt in the current directory.
 
       Examples:
-        python3 extract_locators.py song.als --output=locators.tsv
-        python3 extract_locators.py song.als --output=adjusted_locators.tsv
-        python3 extract_locators.py song.als -o locators.tsv
+        python3 src/extract_locators.py song.als --output=locators.tsv
+        python3 src/extract_locators.py song.als --output=adjusted_locators.tsv
+        python3 src/extract_locators.py song.als -o locators.tsv
 
   --time-header=LABEL
       Use LABEL as the first TSV column heading.
       Default: Time
 
       Example:
-        python3 extract_locators.py song.als --time-header=Start
+        python3 src/extract_locators.py song.als --time-header=Start
 
   --label-header=LABEL
       Use LABEL as the second TSV column heading.
       Default: Locator Name
 
       Example:
-        python3 extract_locators.py song.als --label-header=Title
+        python3 src/extract_locators.py song.als --label-header=Title
 
   --no-heading-row
   --no-header
       Omit the TSV heading row entirely.
 
       Example:
-        python3 extract_locators.py song.als --no-heading-row
+        python3 src/extract_locators.py song.als --no-heading-row
 
   --mixcloud=PATH
   -m PATH
@@ -127,15 +127,15 @@ Arguments:
         MM:SS Locator Name
 
       Examples:
-        python3 extract_locators.py song.als --mixcloud=mixcloud.txt
-        python3 extract_locators.py song.als -m mixcloud.txt
+        python3 src/extract_locators.py song.als --mixcloud=mixcloud.txt
+        python3 src/extract_locators.py song.als -m mixcloud.txt
 
 Combined examples:
-  python3 extract_locators.py song.als --add-offset=27.5 --precision=2 --output=adjusted_locators.tsv
-  python3 extract_locators.py song.als --time-header=TIME --label-header=LABEL --output=ensemble.tsv
-  python3 extract_locators.py song.als --no-heading-row --output=locators.tsv
-  python3 extract_locators.py song.als --add-offset=27 --mixcloud=mixcloud.txt
-  python3 extract_locators.py song.als --add-offset=27 --strip-keys --output=locators.tsv --mixcloud=mixcloud.txt
+  python3 src/extract_locators.py song.als --add-offset=27.5 --precision=2 --output=adjusted_locators.tsv
+  python3 src/extract_locators.py song.als --time-header=TIME --label-header=LABEL --output=ensemble.tsv
+  python3 src/extract_locators.py song.als --no-heading-row --output=locators.tsv
+  python3 src/extract_locators.py song.als --add-offset=27 --mixcloud=mixcloud.txt
+  python3 src/extract_locators.py song.als --add-offset=27 --strip-keys --output=locators.tsv --mixcloud=mixcloud.txt
 """
 
 import argparse
@@ -754,12 +754,12 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  python3 extract_locators.py song.als\n"
-            "  python3 extract_locators.py song.als --output=locators.tsv\n"
-            "  python3 extract_locators.py song.als --time-header=TIME --label-header=LABEL\n"
-            "  python3 extract_locators.py song.als --no-heading-row\n"
-            "  python3 extract_locators.py song.als --mixcloud=mixcloud.txt\n"
-            "  python3 extract_locators.py song.als --add-offset=27 --strip-keys --output=locators.tsv --mixcloud=mixcloud.txt"
+            "  python3 src/extract_locators.py song.als\n"
+            "  python3 src/extract_locators.py song.als --output=locators.tsv\n"
+            "  python3 src/extract_locators.py song.als --time-header=TIME --label-header=LABEL\n"
+            "  python3 src/extract_locators.py song.als --no-heading-row\n"
+            "  python3 src/extract_locators.py song.als --mixcloud=mixcloud.txt\n"
+            "  python3 src/extract_locators.py song.als --add-offset=27 --strip-keys --output=locators.tsv --mixcloud=mixcloud.txt"
         ),
     )
 
