@@ -6,7 +6,7 @@ Python scripts for dealing with Ableton Live and its session files.
 
 ### Extract Locators
 
-`src/extract_locators.py` extracts Ableton Live arrangement locators from `.als` session files and writes timestamped tracklists. It supports tempo changes, linear tempo ramps, offsets, TSV exports, Mixcloud exports, optional key stripping, and configurable TSV heading rows.
+`src/extract_locators.py` extracts Ableton Live arrangement locators from `.als` session files and writes timestamped tracklists. It supports tempo changes, linear tempo ramps, offsets, TSV exports, Mixcloud exports, JSON exports, optional key stripping, configurable TSV heading rows, and optional locator metadata columns.
 
 Read the full guide and release notes in [Extract Locators](<Extract Locators.md>).
 

@@ -6,7 +6,7 @@ The script uses only the Python 3 standard library.
 
 ## Current Version
 
-Version: `2026.05.16`
+Version: `2026.05.17`
 
 Author: Evan Musial <evan@evan.engineer>
 
@@ -15,6 +15,18 @@ License: Creative Commons Attribution-ShareAlike 4.0 International
 This license requires that reusers give credit to the creator. It allows reusers to distribute, remix, adapt, and build upon the material in any medium or format, even for commercial purposes. If others remix, adapt, or build upon the material, they must license the modified material under identical terms.
 
 ## Release Notes
+
+### 2026.05.17
+
+- Added optional TSV and JSON export columns for tempo, song position, time signature, absolute seconds, normalized seconds, absolute beats, bar number, time signature section start, Ableton locator ID, and track number.
+- Added `--columns`, `--all-columns`, and individual `--include-*` options for choosing locator metadata fields.
+- Added `--track-number-offset`, allowing positive track-number offsets and `-1` when the first exported track should be numbered `0`.
+- Added JSON export with `--json` / `-j`.
+- Added `--json-format=pretty|compact` for human-readable or compact JSON files.
+- Added metadata validation exemplars generated from `examples/validation/RYM_2026-03.als`.
+- Updated CLI reports to use the `Locator Extraction Results` heading, list every written file as an `output` row, and show elapsed time with three decimal places.
+- Documented success and error exit codes for scripting and CI usage.
+- Added [docs/locator-export-roadmap.md](docs/locator-export-roadmap.md) as a checklist for future locator export ideas.
 
 ### 2026.05.16
 
@@ -113,6 +125,77 @@ With `--precision=0`, timestamps are written as `MM:SS`. With decimal precision,
 
 Mixcloud output always uses whole-second timestamps.
 
+## Metadata Columns
+
+The default TSV and JSON columns are:
+
+```text
+time,label
+```
+
+Use `--columns` to choose a comma-separated set of columns:
+
+```bash
+python3 src/extract_locators.py song.als --columns=time,label,tempo,time_signature --output=locators.tsv
+python3 src/extract_locators.py song.als --columns=all --output=locators.tsv
+```
+
+You can also append columns to the default `time,label` export with individual flags:
+
+```bash
+python3 src/extract_locators.py song.als --include-tempo --include-song-position --include-time-signature --output=locators.tsv
+```
+
+Available columns are:
+
+- `time`: the exported timestamp after normalization and user offset.
+- `label`: the locator name.
+- `tempo`: the current tempo in BPM at the locator.
+- `song_position`: the current `bar.beat.sixteenth` position.
+- `time_signature`: the current time signature.
+- `absolute_seconds`: elapsed seconds from the beginning of the session.
+- `normalized_seconds`: seconds after earliest-locator normalization and before user offset.
+- `absolute_beats`: the raw Ableton beat position.
+- `bar_number`: the current bar number.
+- `time_signature_section_start`: the song position where the current time signature began.
+- `locator_id`: the Ableton locator ID.
+- `track_number`: sequential track number after sorting locators by time.
+
+Use `--track-number-offset` when exporting `track_number`:
+
+```bash
+python3 src/extract_locators.py song.als --include-track-number --track-number-offset=4 --output=locators.tsv
+```
+
+With `--track-number-offset=4`, the first exported locator is numbered `5`. The only accepted negative offset is `-1`, which numbers the first exported locator `0`.
+
+## JSON Output
+
+Use `--json` or `-j` to write a JSON file in addition to the TSV output:
+
+```bash
+python3 src/extract_locators.py song.als --json=locators.json
+python3 src/extract_locators.py song.als -j locators.json
+```
+
+JSON uses the same selected columns as TSV. Use `--columns=all` to include every field:
+
+```bash
+python3 src/extract_locators.py song.als --columns=all --json=locators.json
+```
+
+Human-readable JSON is the default:
+
+```bash
+python3 src/extract_locators.py song.als --json=locators.json --json-format=pretty
+```
+
+Use compact JSON when file size matters:
+
+```bash
+python3 src/extract_locators.py song.als --json=locators.json --json-format=compact
+```
+
 ## Heading Options
 
 The default TSV heading row is:
@@ -174,17 +257,19 @@ The script prints a short status report after it runs. Successful output include
 
 - The input session path.
 - The number of locators processed.
-- The output file path.
-- The Mixcloud file path, when requested.
-- The elapsed processing time.
+- One `output` row for each written file, including TSV, Mixcloud, and JSON outputs.
+- The elapsed processing time, shown to three decimal places.
 
-Errors use the same compact reporting format for issues such as missing files, unreadable files, invalid option combinations, malformed XML, or invalid tempo data.
+Reports are headed `Locator Extraction Results`. Errors use the same compact reporting format for issues such as missing files, unreadable files, invalid option combinations, malformed XML, or invalid tempo data.
+
+Successful runs exit with status code `0`. Runtime errors exit with status code `1`, and command-line argument errors exit with status code `2`.
 
 ## Notes For Maintainers
 
 The current parser streams Ableton XML with Python's Expat parser and collects only the data needed for locator extraction:
 
 - Tempo automation envelopes identified by Ableton `PointeeId=8`.
+- Time signature automation envelopes identified by Ableton `PointeeId=10`.
 - Arrangement `Locator` elements.
 
 After parsing, tempo events are sorted, integrated into elapsed seconds, and searched with `bisect` when converting locator beat positions to real time. This keeps the script fast on large `.als` files while preserving the standard-library-only design.
