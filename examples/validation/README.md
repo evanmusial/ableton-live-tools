@@ -18,6 +18,7 @@ These files are canonical examples for future testing and validation of
 - `RYM_2026-03_tracks.cue`: Expected CUE sheet output generated with a 27-second offset and `RYM_2026-03.wav` as the referenced audio filename.
 - `RYM_2026-03_locators_metadata.md`: Expected Markdown locator report generated with every metadata column and a 27-second offset.
 - `RYM_2026-03_markers.mid`: Expected Standard MIDI marker file generated from the locator absolute beat positions.
+- `RYM_2026-03_markers_timing.mid`: Expected Standard MIDI marker file with optional tempo and time-signature timing-map meta events enabled.
 
 ## High-Resolution Output Command
 
@@ -42,6 +43,14 @@ The CSV, Audition marker, WebVTT, CUE, Markdown, and MIDI files were generated f
 
 ```bash
 python3 ~/git/ableton-live-tools/src/extract_locators.py "RYM_2026-03.als" --add-offset=27 --columns=all -o /tmp/ableton-live-tools-2026-06-02-dummy.tsv --csv=RYM_2026-03_locators_metadata.csv --audition=RYM_2026-03_audition_markers.csv --webvtt=RYM_2026-03_chapters.vtt --cue=RYM_2026-03_tracks.cue --cue-audio=RYM_2026-03.wav --markdown=RYM_2026-03_locators_metadata.md --midi=RYM_2026-03_markers.mid
+```
+
+## MIDI Timing Map Output Command
+
+The MIDI timing-map fixture was generated from `RYM_2026-03.als` with:
+
+```bash
+python3 ~/git/ableton-live-tools/src/extract_locators.py "RYM_2026-03.als" --add-offset=27 --columns=all -o /tmp/ableton-live-tools-2026-06-07-dummy.tsv --midi=RYM_2026-03_markers_timing.mid --midi-timing-map
 ```
 
 ## Validation Note

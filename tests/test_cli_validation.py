@@ -209,6 +209,29 @@ class CliValidationTests(unittest.TestCase):
                 actual_midi,
             )
 
+    def test_extract_locators_midi_timing_map_fixture_matches(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            actual_tsv = temp_path / "RYM_2026-03_locators.tsv"
+            actual_midi = temp_path / "RYM_2026-03_markers_timing.mid"
+
+            self.run_cli(
+                LOCATORS_SCRIPT,
+                ALS_PATH,
+                "--add-offset=27",
+                "--columns=all",
+                "--output",
+                actual_tsv,
+                "--midi",
+                actual_midi,
+                "--midi-timing-map",
+            )
+
+            self.assert_binary_files_match(
+                EXAMPLES_DIR / "RYM_2026-03_markers_timing.mid",
+                actual_midi,
+            )
+
     def test_timeline_locator_rows_match_locator_metadata(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             actual_tsv = Path(temp_dir) / "RYM_2026-03.timeline-locators.tsv"
@@ -274,6 +297,17 @@ class CliValidationTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("--cue-audio requires --cue", result.stderr)
+
+    def test_midi_timing_map_without_midi_returns_argument_error(self):
+        result = self.run_cli(
+            LOCATORS_SCRIPT,
+            ALS_PATH,
+            "--midi-timing-map",
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("--midi-timing-map requires --midi", result.stderr)
 
 
 if __name__ == "__main__":

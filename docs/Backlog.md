@@ -26,6 +26,7 @@ Delivered versions:
 - `2026.05.29`: Compatibility, validation, and performance/output roadmap documentation.
 - `2026.05.31`: XML parser fast paths, direct parent/depth path checks, repeatable CLI validation tests, and repeatable benchmark tooling.
 - `2026.06.02`: Standard CSV export, Adobe Audition marker export with `.csv` filenames containing tab-separated marker rows for Audition import compatibility, WebVTT chapter export, CUE sheet export, Markdown report export, and Standard MIDI locator marker export.
+- `2026.06.07`: Optional Standard MIDI timing-map export with tempo and time-signature meta events, single-pass reuse of parsed timing data for MIDI output, and locator timing-context performance cleanup.
 
 ### Extract Timeline
 
@@ -38,6 +39,7 @@ Delivered versions:
 - `2026.05.21`: Initial timeline extraction with tempo events, tempo ramps, time signatures, detected key/scale entries, locators, clip boundaries, song end, optional bar/beat grids, sample-index calculation, sample-rate/bit-depth metadata, TSV output, JSON output, selectable event types, selectable columns, and `--end-beat`.
 - `2026.05.29`: Compatibility, validation, and performance/output roadmap documentation.
 - `2026.05.31`: XML parser fast paths, target-aware parsing, direct parent/depth path checks, repeatable CLI validation tests, and repeatable benchmark tooling.
+- `2026.06.07`: Timing-context performance cleanup, lazy `details` payload construction, and beat-grid timing reuse.
 
 ### Validation And Benchmark Infrastructure
 
@@ -49,6 +51,7 @@ Delivered versions:
 
 - `2026.05.17`: Canonical validation fixtures for `examples/validation/RYM_2026-03.als`.
 - `2026.05.31`: Standard-library `unittest` CLI validation suite and `scripts/benchmark_validation.py` benchmark runner with optional git-ref comparison.
+- `2026.06.07`: MIDI timing-map fixture and regression checks, plus expanded CLI argument-error coverage.
 
 ## Proposed
 

@@ -21,7 +21,7 @@ The main finding is that XML parsing dominates runtime. Output writing is compar
 - [x] Add a tag-name fast path in XML end-element handlers, so most unrelated closing tags skip deeper parser-state checks.
 - [x] Replace fixed tuple-slice path checks with direct parent/depth checks for hot XML paths.
 - [x] Defer media-path and audio-header work until an output column or metadata block actually needs source file details.
-- Avoid JSON serialization for TSV `details` cells unless the selected columns include `details`.
+- [x] Avoid building or serializing event `details` payloads unless the selected columns include `details`.
 - Keep streaming XML parsing as the default model, because it preserves the large memory savings already achieved in `2026.05.16`.
 
 ## 2026.05.31 Measured Improvements
@@ -62,11 +62,44 @@ Validation:
 - CUE sheet (`.cue`): delivered in `2026.06.02` for `extract_locators.py` as locator-based track indexes with optional rendered-audio filename selection.
 - Markdown (`.md`): delivered in `2026.06.02` for `extract_locators.py` as a human-readable locator report that mirrors selected export columns.
 - Standard MIDI marker file (`.mid`): delivered in `2026.06.02` for `extract_locators.py` as locator marker meta events at absolute Ableton beat positions.
+- Optional MIDI timing map (`.mid`): delivered in `2026.06.07` for `extract_locators.py` with tempo and time-signature meta events alongside locator marker meta events.
 
 ## Output Format Candidates
 
-- Expanded Standard MIDI map (`.mid`): add full tempo map, time signatures, and key signatures as MIDI meta events in addition to locator markers.
+- MIDI key-signature map (`.mid`): add key-signature meta events when a reliable global key/signature source can be extracted from the ALS.
 - REAPER marker CSV: export locators and timing markers for moving cue data into REAPER.
+
+## 2026.06.07 Performance Check
+
+Benchmarks were run on `examples/validation/RYM_2026-03.als` with Python 3.14.5. Each row uses the median of seven runs and the elapsed time reported by the CLI.
+
+| Tool / Export Shape | Baseline Median | Optimized Median | Change |
+| --- | ---: | ---: | ---: |
+| `extract_locators.py` metadata TSV + JSON | `0.694s` | `0.691s` | `0.4%` faster |
+| `extract_timeline.py` locator-only TSV | `0.706s` | `0.703s` | `0.4%` faster |
+| `extract_timeline.py` beat grid with tempo, time signature, key, locator, and sample index | `0.774s` | `0.762s` | `1.6%` faster |
+| `extract_timeline.py` full TSV + JSON | `0.803s` | `0.781s` | `2.7%` faster |
+
+These changes are cleanup-oriented and low-risk rather than a major parser breakthrough. The final validation comparison showed modest improvements across all measured benchmark cases.
+
+Implemented changes:
+
+- Precomputed time-signature section-start positions in both locator and timeline timing contexts.
+- Replaced per-row timing dictionaries with compact named tuple timing contexts.
+- Deferred timeline `details` dictionaries unless the selected columns include `details`.
+- Reused the generated bar row's timing values for the matching beat-one row in beat-grid timeline exports.
+- Raised the locator parser's streaming XML read chunk size from `1 MiB` to `4 MiB`.
+- Added optional MIDI timing-map output with tempo and time-signature meta events for `extract_locators.py`.
+- Reused the locator extractor's parsed tempo and time-signature maps for MIDI timing output instead of reparsing the ALS file.
+
+Validation:
+
+- `python3 -m py_compile src/extract_locators.py src/extract_timeline.py tests/test_cli_validation.py`
+- `python3 -m unittest discover -s tests`
+- `python3 scripts/benchmark_validation.py --compare-ref=main`
+- `git diff --check`
+- Standard marker-only MIDI output remained byte-identical to the existing validation fixture.
+- New MIDI timing-map output compared byte-for-byte against `examples/validation/RYM_2026-03_markers_timing.mid`.
 
 ## 2026.06.02 Validation Notes
 

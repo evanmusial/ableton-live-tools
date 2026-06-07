@@ -1,12 +1,12 @@
 # Extract Locators
 
-`src/extract_locators.py` extracts Ableton Live arrangement locators from an `.als` session file and writes timestamped tracklists. It is designed for preparing time and label exports for show notes, livestream descriptions, Mixcloud uploads, Adobe Audition marker imports, WebVTT chapters, CUE sheets, Markdown reports, MIDI marker files, and other post-production notes.
+`src/extract_locators.py` extracts Ableton Live arrangement locators from an `.als` session file and writes timestamped tracklists. It is designed for preparing time and label exports for show notes, livestream descriptions, Mixcloud uploads, Adobe Audition marker imports, WebVTT chapters, CUE sheets, Markdown reports, MIDI marker/timing files, and other post-production notes.
 
 The script uses only the Python 3 standard library.
 
 ## Current Version
 
-Version: `2026.06.02`
+Version: `2026.06.07`
 
 Author: Evan Musial <evan@evan.engineer>
 
@@ -15,6 +15,18 @@ License: Creative Commons Attribution-ShareAlike 4.0 International
 This license requires that reusers give credit to the creator. It allows reusers to distribute, remix, adapt, and build upon the material in any medium or format, even for commercial purposes. If others remix, adapt, or build upon the material, they must license the modified material under identical terms.
 
 ## Release Notes
+
+### 2026.06.07
+
+- Added optional MIDI timing-map output with `--midi-timing-map`.
+- When enabled, the Standard MIDI export now includes tempo and time-signature meta events alongside locator marker meta events.
+- Kept the default `--midi` behavior as a marker-only file for compatibility with the `2026.06.02` fixture and existing user workflows.
+- Reused the already parsed tempo and time-signature maps for MIDI timing output instead of reading the ALS file a second time.
+- Precomputed time-signature section-start positions and changed locator timing context from dictionaries to a compact named tuple.
+- Raised the locator parser's streaming XML read chunk size from `1 MiB` to `4 MiB` to reduce parser I/O overhead while preserving streaming behavior.
+- Added a validation fixture for `RYM_2026-03_markers_timing.mid`.
+- Added CLI regression tests for MIDI timing-map output and the `--midi-timing-map` / `--midi` argument dependency.
+- Against `main` on `RYM_2026-03.als`, the locator metadata TSV + JSON benchmark improved from `0.694s` to `0.691s`, about `0.4%` faster.
 
 ### 2026.06.02
 
@@ -277,7 +289,15 @@ python3 src/extract_locators.py song.als --midi=markers.mid
 
 MIDI output stores each locator as a MIDI marker meta event in a single-track Standard MIDI file. Marker placement uses the locator's absolute Ableton beat position converted to MIDI ticks, not the normalized/output text timestamp. That means `--add-offset` shifts text-oriented exports such as TSV, Mixcloud, CSV, WebVTT, CUE, and Markdown, but it does not shift MIDI beat positions.
 
-The `2026.06.02` MIDI export is locator-marker focused. A richer MIDI export that includes the full tempo map, time signatures, and key signatures remains a roadmap item.
+Use `--midi-timing-map` with `--midi` to add tempo and time-signature meta events to the same Standard MIDI file:
+
+```bash
+python3 src/extract_locators.py song.als --midi=markers.mid --midi-timing-map
+```
+
+The default `--midi` output remains marker-only. The timing-map option is explicit because some workflows only want locator markers and do not want an imported tempo/signature map to affect a DAW session.
+
+Standard MIDI represents tempo with discrete tempo meta events. Ableton linear tempo ramps are exported as their tempo automation points rather than as mathematically continuous ramp curves, because Standard MIDI has no native continuous-ramp meta event.
 
 ## Timing Options
 
