@@ -26,7 +26,7 @@ Delivered versions:
 - `2026.05.29`: Compatibility, validation, and performance/output roadmap documentation.
 - `2026.05.31`: XML parser fast paths, direct parent/depth path checks, repeatable CLI validation tests, and repeatable benchmark tooling.
 - `2026.06.02`: Standard CSV export, Adobe Audition marker export with `.csv` filenames containing tab-separated marker rows for Audition import compatibility, WebVTT chapter export, CUE sheet export, Markdown report export, and Standard MIDI locator marker export.
-- `2026.06.07`: Optional Standard MIDI timing-map export with tempo and time-signature meta events, single-pass reuse of parsed timing data for MIDI output, and locator timing-context performance cleanup.
+- `2026.06.07`: REAPER marker CSV export, Logic Pro/Pro Tools/Cubase/Nuendo MIDI marker-map presets, optional Standard MIDI timing-map export with tempo and time-signature meta events, single-pass reuse of parsed timing data for MIDI output, and locator timing-context performance cleanup.
 
 ### Extract Timeline
 
@@ -51,127 +51,105 @@ Delivered versions:
 
 - `2026.05.17`: Canonical validation fixtures for `examples/validation/RYM_2026-03.als`.
 - `2026.05.31`: Standard-library `unittest` CLI validation suite and `scripts/benchmark_validation.py` benchmark runner with optional git-ref comparison.
-- `2026.06.07`: MIDI timing-map fixture and regression checks, plus expanded CLI argument-error coverage.
+- `2026.06.07`: MIDI timing-map fixture and regression checks, DAW MIDI marker-map preset checks, Project Manifest semantic checks, Project Health Checker checks, Semantic ALS Diff no-change checks, plus expanded CLI argument-error coverage.
 
-## Proposed
+### Sample & Plugin/Effects Manifest
 
-## Project Health Checker
+Status: ✅ `Delivered`
 
-Status: `Proposed`
+Create a bill of materials for the Live Set's audio references, native devices, third-party plugins, and effects.
+
+Delivered versions:
+
+- `2026.06.07`: Initial `src/extract_project_manifest.py` release with `samples.tsv`, `devices.tsv`, Markdown, JSON, sample usage counts, original file size/CRC fields, default sample rate/duration fields, resolved-path checks, missing-sample status, device/plugin locations, manufacturers, formats, enabled states, placeholder states, and preset names where detectable.
+
+### Project Inventory
+
+Status: ✅ `Delivered`
+
+Produce a broad inventory of Ableton project contents.
+
+Delivered versions:
+
+- `2026.06.07`: Initial project inventory report with track counts, clip counts, freeze clip counts, sample counts, missing/existing sample counts, device counts, third-party plugin counts, Ableton native device counts, locator counts, tempo-event counts, time-signature-event counts, `tracks.tsv`, `clips.tsv`, `project_inventory.md`, and full `project_manifest.json`.
+
+### Plugin Manifest
+
+Status: ✅ `Delivered`
+
+Extract plugins/effects used in the session, with views sorted by author and by plugin/effect name.
+
+Delivered versions:
+
+- `2026.06.07`: Initial plugin/effects manifest through `src/extract_project_manifest.py`, including `plugins_by_author.tsv`, `plugins_by_name.tsv`, JSON plugin views, manufacturer/author fields, format fields, track location, device position, enabled state, placeholder state, and preset names where detectable.
+
+### Project Health Checker
+
+Status: ✅ `Delivered`
 
 Inspect an Ableton Live session and report anything that might make the project hard to open, transfer, archive, render, or collaborate on.
 
-Possible checks:
+Delivered versions:
+
+- `2026.06.07`: Initial `src/check_project_health.py` release with terminal, Markdown, and JSON reports; configurable `--fail-on=critical|warning|any|none`; critical findings for missing samples and placeholder plugins; warnings for outside-project sample references, mixed sample rates, disabled clips/devices, unknown plugin authors, unnamed tracks, and long sample paths; and info reporting for freeze clips.
+
+Delivered checks:
 
 - Missing audio files.
 - Referenced files outside the project folder.
-- Mixed sample rates or bit depths.
-- Missing, unknown, or unavailable plugins.
+- Mixed sample rates.
+- Placeholder plugins.
+- Unknown plugin authors.
 - Disabled clips or devices.
-- Frozen tracks and freeze-file references.
-- External preset references.
+- Freeze clips.
 - Very long file paths.
-- Suspicious routing, sends, or track delay.
-- Ableton Live version used to create the set.
 
-Possible outputs:
+Delivered outputs:
 
 - Terminal summary.
 - Markdown report.
 - JSON report for automation or CI.
 
-## Semantic ALS Diff
+Future expansion ideas:
 
-Status: `Proposed`
+- Bit-depth checks when reliable bit-depth extraction is available.
+- External preset references.
+- Suspicious routing, sends, or track delay.
+- Ableton Live creator/version reporting in the health report.
+- Full frozen-track and freeze-file reference analysis.
+
+### Semantic ALS Diff
+
+Status: ✅ `Delivered`
 
 Compare two `.als` files and report meaningful musical/project changes instead of raw XML differences.
 
-Possible comparisons:
+Delivered versions:
 
-- Locators added, removed, renamed, or moved.
-- Tracks added, removed, renamed, reordered, recolored, or regrouped.
-- Clips moved, shortened, lengthened, disabled, renamed, or retimed.
-- Tempo, time signature, and key/scale changes.
-- Devices, plugins, and effects added, removed, reordered, or changed.
-- Mixer changes such as volume, pan, sends, mute state, and track delay.
-- Automation added, removed, or changed.
+- `2026.06.07`: Initial `src/diff_als_semantic.py` release with terminal, Markdown, and JSON reports; script-friendly same/different exit behavior; `--no-fail-on-diff`; summary-count changes; and added/removed comparisons for tracks, clips, samples, devices/plugins, locators, tempo events, and time-signature events.
+
+Delivered comparisons:
+
+- Locators added or removed by semantic position/name signature.
+- Tracks added or removed by semantic inventory signature.
+- Clips added or removed by track, clip, timing, disabled state, and sample signature.
+- Tempo and time-signature events added or removed.
+- Devices, plugins, and effects added or removed.
 - Sample references changed.
 
-Possible outputs:
+Delivered outputs:
 
 - Human-readable Markdown diff.
 - Terminal summary.
 - JSON diff for Git hooks or release automation.
 
-## Sample & Plugin/Effects Manifest
+Future expansion ideas:
 
-Status: `Proposed`
+- Rename/move/reorder classification instead of added/removed inventory rows only.
+- Key/scale changes.
+- Mixer changes such as volume, pan, sends, mute state, and track delay.
+- Automation added, removed, or changed.
 
-Create a bill of materials for everything the Live Set depends on.
+## Proposed
 
-Possible fields:
-
-- Audio file paths, relative paths, sizes, sample rates, bit depths, durations, and checksums.
-- Which clips use each audio file.
-- Missing-file status.
-- Built-in Ableton devices.
-- Third-party plugins and effects.
-- Max for Live devices.
-- Preset references where available.
-- Track and device-chain location for each dependency.
-
-Possible outputs:
-
-- TSV manifest.
-- JSON manifest.
-- Markdown archive report.
-
-## Project Inventory
-
-Status: `Proposed`
-
-Produce a broad inventory of the contents of an Ableton Live project, covering all MIDI files, sound files, plugins, effects, devices, tracks, groups, and arrangement/session elements that can be reasonably extracted from the `.als` file.
-
-Possible fields:
-
-- Tracks, groups, returns, and master track.
-- Track names, colors, routing, sends, and clip counts.
-- MIDI clips and MIDI note counts.
-- Audio clips and source media.
-- Locators.
-- Tempo and time signature map.
-- Session and clip scale/key metadata.
-- Devices, plugins, effects, racks, and macros.
-- Automation envelope counts by track/device/parameter.
-
-Possible outputs:
-
-- Markdown project summary.
-- TSV tables for spreadsheet review.
-- JSON for scripting and future tools.
-
-## Plugin Manifest
-
-Status: `Proposed`
-
-Extract every plugin/effect used in the session, with views sorted by author and by plugin/effect name.
-
-Possible fields:
-
-- Plugin/effect name.
-- Manufacturer/author, where detectable.
-- Format or device type, such as Ableton native, AU, VST, VST3, or Max for Live.
-- Track name.
-- Device-chain position.
-- Rack location and macro context.
-- Enabled/disabled state.
-- Preset reference, where available.
-- Duplicate usage count.
-- Missing or unavailable status, where detectable.
-
-Possible outputs:
-
-- `plugins_by_author.tsv`
-- `plugins_by_name.tsv`
-- Markdown plugin report.
-- JSON manifest for automation.
+No proposed backlog items are currently pending. New ideas should be added here first, then moved into the delivered section with a version note when they ship.

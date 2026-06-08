@@ -46,7 +46,7 @@ Implemented changes:
 
 Validation:
 
-- `python3 -m py_compile src/extract_locators.py src/extract_timeline.py tests/test_cli_validation.py`
+- `python3 -m py_compile src/extract_locators.py src/extract_timeline.py src/extract_project_manifest.py tests/test_cli_validation.py`
 - `python3 -m unittest discover -s tests`
 - `python3 scripts/benchmark_validation.py --compare-ref=main`
 - `git diff --check`
@@ -56,18 +56,27 @@ Validation:
 
 ## Delivered Output Formats
 
-- Adobe Audition marker import (`.csv`): delivered in `2026.06.02` for `extract_locators.py`. The filename extension follows Audition's import workflow, while the file contents are intentionally tab-separated marker rows.
-- CSV (`.csv`): delivered in `2026.06.02` for `extract_locators.py` as a normal comma-separated mirror of the selected TSV/JSON locator columns.
-- WebVTT (`.vtt`): delivered in `2026.06.02` for `extract_locators.py` as locator-based chapter cues.
-- CUE sheet (`.cue`): delivered in `2026.06.02` for `extract_locators.py` as locator-based track indexes with optional rendered-audio filename selection.
-- Markdown (`.md`): delivered in `2026.06.02` for `extract_locators.py` as a human-readable locator report that mirrors selected export columns.
-- Standard MIDI marker file (`.mid`): delivered in `2026.06.02` for `extract_locators.py` as locator marker meta events at absolute Ableton beat positions.
-- Optional MIDI timing map (`.mid`): delivered in `2026.06.07` for `extract_locators.py` with tempo and time-signature meta events alongside locator marker meta events.
+- [x] Adobe Audition marker import (`.csv`): delivered in `2026.06.02` for `extract_locators.py`. The filename extension follows Audition's import workflow, while the file contents are intentionally tab-separated marker rows.
+- [x] CSV (`.csv`): delivered in `2026.06.02` for `extract_locators.py` as a normal comma-separated mirror of the selected TSV/JSON locator columns.
+- [x] WebVTT (`.vtt`): delivered in `2026.06.02` for `extract_locators.py` as locator-based chapter cues.
+- [x] CUE sheet (`.cue`): delivered in `2026.06.02` for `extract_locators.py` as locator-based track indexes with optional rendered-audio filename selection.
+- [x] Markdown (`.md`): delivered in `2026.06.02` for `extract_locators.py` as a human-readable locator report that mirrors selected export columns.
+- [x] Standard MIDI marker file (`.mid`): delivered in `2026.06.02` for `extract_locators.py` as locator marker meta events at absolute Ableton beat positions.
+- [x] Optional MIDI timing map (`.mid`): delivered in `2026.06.07` for `extract_locators.py` with tempo and time-signature meta events alongside locator marker meta events.
+- [x] REAPER marker CSV (`.csv`): delivered in `2026.06.07` for `extract_locators.py` as locator marker rows using REAPER's Region/Marker Manager CSV columns.
+- [x] Logic Pro, Pro Tools, Cubase, and Nuendo MIDI marker-map presets (`.mid`): delivered in `2026.06.07` for `extract_locators.py` as DAW-named Standard MIDI marker maps that include locator markers plus tempo and time-signature meta events by default.
+
+## Delivered Backlog/Roadmap Tools
+
+- [x] Sample & Plugin/Effects Manifest: delivered in `2026.06.07` as `src/extract_project_manifest.py`.
+- [x] Project Inventory: delivered in `2026.06.07` as part of `src/extract_project_manifest.py`.
+- [x] Plugin Manifest: delivered in `2026.06.07` as plugin/effect TSV and JSON views from `src/extract_project_manifest.py`.
+- [x] Project Health Checker: delivered in `2026.06.07` as `src/check_project_health.py`.
+- [x] Semantic ALS Diff: delivered in `2026.06.07` as `src/diff_als_semantic.py`.
 
 ## Output Format Candidates
 
 - MIDI key-signature map (`.mid`): add key-signature meta events when a reliable global key/signature source can be extracted from the ALS.
-- REAPER marker CSV: export locators and timing markers for moving cue data into REAPER.
 
 ## 2026.06.07 Performance Check
 
@@ -75,12 +84,12 @@ Benchmarks were run on `examples/validation/RYM_2026-03.als` with Python 3.14.5.
 
 | Tool / Export Shape | Baseline Median | Optimized Median | Change |
 | --- | ---: | ---: | ---: |
-| `extract_locators.py` metadata TSV + JSON | `0.694s` | `0.691s` | `0.4%` faster |
-| `extract_timeline.py` locator-only TSV | `0.706s` | `0.703s` | `0.4%` faster |
-| `extract_timeline.py` beat grid with tempo, time signature, key, locator, and sample index | `0.774s` | `0.762s` | `1.6%` faster |
-| `extract_timeline.py` full TSV + JSON | `0.803s` | `0.781s` | `2.7%` faster |
+| `extract_locators.py` metadata TSV + JSON | `0.687s` | `0.687s` | `0.0%` faster |
+| `extract_timeline.py` locator-only TSV | `0.701s` | `0.699s` | `0.3%` faster |
+| `extract_timeline.py` beat grid with tempo, time signature, key, locator, and sample index | `0.766s` | `0.760s` | `0.8%` faster |
+| `extract_timeline.py` full TSV + JSON | `0.786s` | `0.782s` | `0.5%` faster |
 
-These changes are cleanup-oriented and low-risk rather than a major parser breakthrough. The final validation comparison showed modest improvements across all measured benchmark cases.
+These changes are cleanup-oriented and low-risk rather than a major parser breakthrough. The final validation comparison showed no material performance regression; every measured existing path was flat or slightly faster against `main`.
 
 Implemented changes:
 
@@ -91,15 +100,25 @@ Implemented changes:
 - Raised the locator parser's streaming XML read chunk size from `1 MiB` to `4 MiB`.
 - Added optional MIDI timing-map output with tempo and time-signature meta events for `extract_locators.py`.
 - Reused the locator extractor's parsed tempo and time-signature maps for MIDI timing output instead of reparsing the ALS file.
+- Added REAPER marker CSV output for `extract_locators.py`.
+- Added Logic Pro, Pro Tools, Cubase, and Nuendo Standard MIDI marker-map presets for `extract_locators.py`.
+- Added `src/extract_project_manifest.py` for project inventory, sample manifests, and plugin/effects manifests.
+- Added `src/check_project_health.py` for project-health reports.
+- Added `src/diff_als_semantic.py` for semantic Ableton Live set diffs.
 
 Validation:
 
-- `python3 -m py_compile src/extract_locators.py src/extract_timeline.py tests/test_cli_validation.py`
+- `python3 -m py_compile src/extract_locators.py src/extract_timeline.py src/extract_project_manifest.py src/check_project_health.py src/diff_als_semantic.py tests/test_cli_validation.py`
 - `python3 -m unittest discover -s tests`
 - `python3 scripts/benchmark_validation.py --compare-ref=main`
 - `git diff --check`
 - Standard marker-only MIDI output remained byte-identical to the existing validation fixture.
 - New MIDI timing-map output compared byte-for-byte against `examples/validation/RYM_2026-03_markers_timing.mid`.
+- New REAPER marker CSV output compared byte-for-byte against `examples/validation/RYM_2026-03_reaper_markers.csv`.
+- DAW MIDI marker-map presets were checked for valid Standard MIDI chunks, DAW-specific track names, and expected locator marker payloads.
+- Project Manifest output was validated against expected fixture counts for tracks, clips, sample references, devices, plugin categories, locators, tempo events, and time-signature events.
+- Project Health Checker output was validated against the missing-sample state of the canonical fixture.
+- Semantic ALS Diff was validated against the identical-file no-change case.
 
 ## 2026.06.02 Validation Notes
 

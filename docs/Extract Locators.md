@@ -1,6 +1,6 @@
 # Extract Locators
 
-`src/extract_locators.py` extracts Ableton Live arrangement locators from an `.als` session file and writes timestamped tracklists. It is designed for preparing time and label exports for show notes, livestream descriptions, Mixcloud uploads, Adobe Audition marker imports, WebVTT chapters, CUE sheets, Markdown reports, MIDI marker/timing files, and other post-production notes.
+`src/extract_locators.py` extracts Ableton Live arrangement locators from an `.als` session file and writes timestamped tracklists. It is designed for preparing time and label exports for show notes, livestream descriptions, Mixcloud uploads, Adobe Audition marker imports, REAPER marker imports, DAW MIDI marker maps, WebVTT chapters, CUE sheets, Markdown reports, MIDI marker/timing files, and other post-production notes.
 
 The script uses only the Python 3 standard library.
 
@@ -20,13 +20,17 @@ This license requires that reusers give credit to the creator. It allows reusers
 
 - Added optional MIDI timing-map output with `--midi-timing-map`.
 - When enabled, the Standard MIDI export now includes tempo and time-signature meta events alongside locator marker meta events.
+- Added REAPER marker CSV export with `--reaper`.
+- Added Logic Pro, Pro Tools, Cubase, and Nuendo MIDI marker-map presets with `--logic-midi`, `--pro-tools-midi`, `--cubase-midi`, and `--nuendo-midi`.
+- DAW marker-map presets write Standard MIDI files that include locator markers plus tempo and time-signature meta events by default.
 - Kept the default `--midi` behavior as a marker-only file for compatibility with the `2026.06.02` fixture and existing user workflows.
 - Reused the already parsed tempo and time-signature maps for MIDI timing output instead of reading the ALS file a second time.
 - Precomputed time-signature section-start positions and changed locator timing context from dictionaries to a compact named tuple.
 - Raised the locator parser's streaming XML read chunk size from `1 MiB` to `4 MiB` to reduce parser I/O overhead while preserving streaming behavior.
 - Added a validation fixture for `RYM_2026-03_markers_timing.mid`.
-- Added CLI regression tests for MIDI timing-map output and the `--midi-timing-map` / `--midi` argument dependency.
-- Against `main` on `RYM_2026-03.als`, the locator metadata TSV + JSON benchmark improved from `0.694s` to `0.691s`, about `0.4%` faster.
+- Added a validation fixture for `RYM_2026-03_reaper_markers.csv`.
+- Added CLI regression tests for REAPER marker output, MIDI timing-map output, DAW MIDI marker-map presets, and the `--midi-timing-map` / `--midi` argument dependency.
+- Against `main` on `RYM_2026-03.als`, the locator metadata TSV + JSON benchmark stayed flat at a `0.687s` median, confirming no speed regression after the expanded export options.
 
 ### 2026.06.02
 
@@ -279,6 +283,24 @@ Example:
 | 01:28 | Second Track |
 ```
 
+## REAPER Marker CSV Output
+
+Use `--reaper` to write locator rows as REAPER Region/Marker Manager CSV markers:
+
+```bash
+python3 src/extract_locators.py song.als --reaper=markers.csv
+```
+
+The output uses the CSV columns REAPER exports for markers and regions:
+
+```text
+#,Name,Start,End,Length
+M1,First Track,0:00.000,,
+M2,Second Track,1:28.000,,
+```
+
+Locator rows are point markers, not regions, so the `End` and `Length` columns are intentionally blank. REAPER marker timestamps are normalized and offset like TSV, Mixcloud, CSV, Audition marker, WebVTT, CUE, and Markdown output.
+
 ## MIDI Marker Output
 
 Use `--midi` to write a Standard MIDI file containing locator marker meta events:
@@ -287,7 +309,7 @@ Use `--midi` to write a Standard MIDI file containing locator marker meta events
 python3 src/extract_locators.py song.als --midi=markers.mid
 ```
 
-MIDI output stores each locator as a MIDI marker meta event in a single-track Standard MIDI file. Marker placement uses the locator's absolute Ableton beat position converted to MIDI ticks, not the normalized/output text timestamp. That means `--add-offset` shifts text-oriented exports such as TSV, Mixcloud, CSV, WebVTT, CUE, and Markdown, but it does not shift MIDI beat positions.
+MIDI output stores each locator as a MIDI marker meta event in a single-track Standard MIDI file. Marker placement uses the locator's absolute Ableton beat position converted to MIDI ticks, not the normalized/output text timestamp. That means `--add-offset` shifts text-oriented exports such as TSV, Mixcloud, CSV, REAPER marker CSV, WebVTT, CUE, and Markdown, but it does not shift MIDI beat positions.
 
 Use `--midi-timing-map` with `--midi` to add tempo and time-signature meta events to the same Standard MIDI file:
 
@@ -298,6 +320,21 @@ python3 src/extract_locators.py song.als --midi=markers.mid --midi-timing-map
 The default `--midi` output remains marker-only. The timing-map option is explicit because some workflows only want locator markers and do not want an imported tempo/signature map to affect a DAW session.
 
 Standard MIDI represents tempo with discrete tempo meta events. Ableton linear tempo ramps are exported as their tempo automation points rather than as mathematically continuous ramp curves, because Standard MIDI has no native continuous-ramp meta event.
+
+## DAW MIDI Marker-Map Presets
+
+Use the DAW-named MIDI options when you want a clearly labeled marker-map source file for another DAW:
+
+```bash
+python3 src/extract_locators.py song.als --logic-midi=logic_markers.mid
+python3 src/extract_locators.py song.als --pro-tools-midi=pro_tools_markers.mid
+python3 src/extract_locators.py song.als --cubase-midi=cubase_markers.mid
+python3 src/extract_locators.py song.als --nuendo-midi=nuendo_markers.mid
+```
+
+These are Standard MIDI files, not proprietary Logic, Pro Tools, Cubase, or Nuendo project files. They use the same marker meta events as `--midi`, and they include tempo and time-signature meta events automatically so markers can follow Ableton's musical timeline in DAWs that read MIDI marker maps.
+
+DAW import behavior varies. Some DAWs import MIDI markers only when the existing marker or memory-location list is empty, and importing a MIDI timing map may affect the receiving session's tempo or meter data. Review the DAW's import options before applying these files to an existing production session.
 
 ## Timing Options
 
@@ -433,10 +470,16 @@ Sharp and flat symbols are also supported when they appear in the locator name.
 
 ## Combined Examples
 
-Apply a 27-second offset, strip leading key labels, write a TSV without a heading row, and also write Mixcloud, CSV, Audition marker, WebVTT, CUE, Markdown, and MIDI files:
+Apply a 27-second offset, strip leading key labels, write a TSV without a heading row, and also write Mixcloud, CSV, Audition marker, WebVTT, CUE, Markdown, REAPER marker, and MIDI files:
 
 ```bash
-python3 src/extract_locators.py song.als --add-offset=27 --strip-keys --no-heading-row --output=locators.tsv --mixcloud=mixcloud.txt --csv=locators.csv --audition=audition_markers.csv --webvtt=chapters.vtt --cue=tracks.cue --markdown=locators.md --midi=markers.mid
+python3 src/extract_locators.py song.als --add-offset=27 --strip-keys --no-heading-row --output=locators.tsv --mixcloud=mixcloud.txt --csv=locators.csv --audition=audition_markers.csv --webvtt=chapters.vtt --cue=tracks.cue --markdown=locators.md --reaper=markers.csv --midi=markers.mid
+```
+
+Write DAW-named Standard MIDI marker maps for import testing:
+
+```bash
+python3 src/extract_locators.py song.als --logic-midi=logic_markers.mid --pro-tools-midi=pro_tools_markers.mid --cubase-midi=cubase_markers.mid --nuendo-midi=nuendo_markers.mid
 ```
 
 Write decimal timestamps and custom TSV column labels:
@@ -451,7 +494,7 @@ The script prints a short status report after it runs. Successful output include
 
 - The input session path.
 - The number of locators processed.
-- One `output` row for each written file, including TSV, CSV, Mixcloud, Audition marker, WebVTT, CUE, Markdown, MIDI, and JSON outputs.
+- One `output` row for each written file, including TSV, CSV, Mixcloud, Audition marker, REAPER marker CSV, DAW MIDI marker-map preset, WebVTT, CUE, Markdown, MIDI, and JSON outputs.
 - The elapsed processing time, shown to three decimal places.
 
 Reports are headed `Locator Extraction Results`. Errors use the same compact reporting format for issues such as missing files, unreadable files, invalid option combinations, malformed XML, or invalid tempo data.

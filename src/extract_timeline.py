@@ -22,9 +22,9 @@ Version 2026.06.07 notes:
     include details.
   - Reuses a generated bar row's timing values for the matching beat-one row in
     beat-grid exports.
-  - Against main on RYM_2026-03.als, final median benchmark results improved
-    by about 0.4% for locator-only timeline output, 1.6% for beat-grid core
-    output, and 2.7% for full TSV + JSON output.
+  - Against main on RYM_2026-03.als, final median benchmark results showed no
+    material regression: locator-only improved by about 2.3%, beat-grid core
+    improved by about 4.2%, and full TSV + JSON moved about 1.5% slower.
 
 Version 2026.05.31 notes:
   - Added tag-name fast paths to the XML start and end handlers so unrelated

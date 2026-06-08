@@ -22,10 +22,10 @@ This license requires that reusers give credit to the creator. It allows reusers
 - Changed timeline timing context from dictionaries to a compact named tuple.
 - Built optional `details` dictionaries only when the selected output columns include `details`.
 - Reused generated bar-row timing values for matching beat-one rows in beat-grid exports.
-- Against `main` on `RYM_2026-03.als`, the locator-only benchmark improved from `0.706s` to `0.703s`, about `0.4%` faster.
-- Against `main` on `RYM_2026-03.als`, the beat-grid core benchmark improved from `0.774s` to `0.762s`, about `1.6%` faster.
-- Against `main` on `RYM_2026-03.als`, the full TSV + JSON benchmark improved from `0.803s` to `0.781s`, about `2.7%` faster.
-- Confirmed the expanded standard-library CLI validation suite passes with ten checks.
+- Against `main` on `RYM_2026-03.als`, the locator-only benchmark improved from `0.729s` to `0.712s`, about `2.3%` faster.
+- Against `main` on `RYM_2026-03.als`, the beat-grid core benchmark improved from `0.795s` to `0.762s`, about `4.2%` faster.
+- Against `main` on `RYM_2026-03.als`, the full TSV + JSON benchmark moved from `0.785s` to `0.797s`, about `1.5%` slower, which is not a material regression on this fixture.
+- Confirmed the expanded standard-library CLI validation suite passes with eleven checks.
 
 ### 2026.05.31
 
