@@ -2,7 +2,7 @@
 
 """
 extract_locators.py
-Version: 2026.06.07
+Version: 2026.06.15
 
 Author: Evan Musial <evan@evan.engineer>
 License: Creative Commons Attribution-ShareAlike 4.0 International
@@ -14,7 +14,7 @@ License meaning:
   - If others remix, adapt, or build upon the material, they must license the
     modified material under identical terms.
 
-Version 2026.06.07 notes:
+Version 2026.06.15 notes:
   - Added optional MIDI timing-map output with --midi-timing-map.
   - When enabled, the Standard MIDI export includes tempo and time-signature
     meta events alongside locator marker meta events.
@@ -31,6 +31,7 @@ Version 2026.06.07 notes:
   - Added DAW-named MIDI marker-map presets for Logic Pro, Pro Tools, Cubase,
     and Nuendo. These write Standard MIDI files with locator markers plus tempo
     and time-signature meta events by default.
+  - Tested and validated with Ableton Live 12.4.2 sessions.
 
 Version 2026.06.02 notes:
   - Added Adobe Audition marker export with --audition / -a.
@@ -467,7 +468,7 @@ import zlib
 
 
 SCRIPT_NAME = "extract_locators.py"
-SCRIPT_VERSION = "2026.06.07"
+SCRIPT_VERSION = "2026.06.15"
 REPORT_TITLE = "Locator Extraction Results"
 DEFAULT_BPM = 120.0
 LOCATOR_XML_READ_CHUNK_SIZE = 4 * 1024 * 1024

@@ -2,7 +2,7 @@
 
 """
 extract_project_manifest.py
-Version: 2026.06.07
+Version: 2026.06.15
 
 Author: Evan Musial <evan@evan.engineer>
 License: Creative Commons Attribution-ShareAlike 4.0 International
@@ -14,7 +14,7 @@ License meaning:
   - If others remix, adapt, or build upon the material, they must license the
     modified material under identical terms.
 
-Version 2026.06.07 notes:
+Version 2026.06.15 notes:
   - Initial Project Manifest release.
   - Adds project inventory reporting for tracks, clips, samples, devices, and
     high-level Ableton metadata.
@@ -27,6 +27,7 @@ Version 2026.06.07 notes:
   - Adds plugin views sorted by author/manufacturer and by plugin/effect name.
   - Writes a Markdown report, JSON payload, and TSV tables in one output
     directory.
+  - Tested and validated with Ableton Live 12.4.2 sessions.
 
 What this script does:
   Ableton Live .als files are XML documents, usually gzip-compressed. This tool
@@ -100,7 +101,7 @@ import zlib
 
 
 SCRIPT_NAME = "extract_project_manifest.py"
-SCRIPT_VERSION = "2026.06.07"
+SCRIPT_VERSION = "2026.06.15"
 REPORT_TITLE = "Project Manifest Results"
 XML_READ_CHUNK_SIZE = 4 * 1024 * 1024
 

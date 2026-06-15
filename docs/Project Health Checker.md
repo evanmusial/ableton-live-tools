@@ -6,7 +6,7 @@ The script uses only the Python 3 standard library and reuses the streaming pars
 
 ## Current Version
 
-Version: `2026.06.07`
+Version: `2026.06.15`
 
 Author: Evan Musial <evan@evan.engineer>
 
@@ -16,7 +16,7 @@ This license requires that reusers give credit to the creator. It allows reusers
 
 ## Release Notes
 
-### 2026.06.07
+### 2026.06.15
 
 - Added the initial Project Health Checker CLI.
 - Reused the streaming Project Manifest parser to keep memory use low on large Ableton Live sets.
@@ -26,6 +26,7 @@ This license requires that reusers give credit to the creator. It allows reusers
 - Added terminal, Markdown, and JSON report output.
 - Added `--fail-on=critical|warning|any|none` for CI and scripted workflows.
 - Added CLI validation coverage against the canonical `RYM_2026-03.als` fixture.
+- Tested and validated with Ableton Live 12.4.2 sessions.
 
 ## What It Does
 

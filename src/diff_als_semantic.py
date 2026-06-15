@@ -2,7 +2,7 @@
 
 """
 diff_als_semantic.py
-Version: 2026.06.07
+Version: 2026.06.15
 
 Author: Evan Musial <evan@evan.engineer>
 License: Creative Commons Attribution-ShareAlike 4.0 International
@@ -14,13 +14,14 @@ License meaning:
   - If others remix, adapt, or build upon the material, they must license the
     modified material under identical terms.
 
-Version 2026.06.07 notes:
+Version 2026.06.15 notes:
   - Initial Semantic ALS Diff release.
   - Compares two Ableton Live .als files using extracted project meaning rather
     than raw XML byte/text differences.
   - Reports summary-count changes plus added/removed tracks, clips, samples,
     devices/plugins, locators, tempo events, and time-signature events.
   - Writes Markdown and JSON diff reports for review, archiving, and automation.
+  - Tested and validated with Ableton Live 12.4.2 sessions.
 
 What this script does:
   Ableton Live .als files contain many XML details that are not useful when a
@@ -93,7 +94,7 @@ from extract_project_manifest import (
 
 
 SCRIPT_NAME = "diff_als_semantic.py"
-SCRIPT_VERSION = "2026.06.07"
+SCRIPT_VERSION = "2026.06.15"
 REPORT_TITLE = "Semantic ALS Diff Results"
 MAX_REPORT_ITEMS = 80
 

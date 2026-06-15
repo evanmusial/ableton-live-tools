@@ -2,7 +2,7 @@
 
 """
 extract_timeline.py
-Version: 2026.06.07
+Version: 2026.06.15
 
 Author: Evan Musial <evan@evan.engineer>
 License: Creative Commons Attribution-ShareAlike 4.0 International
@@ -14,7 +14,7 @@ License meaning:
   - If others remix, adapt, or build upon the material, they must license the
     modified material under identical terms.
 
-Version 2026.06.07 notes:
+Version 2026.06.15 notes:
   - Precomputes time-signature section positions so repeated timeline rows do
     not recalculate section-start labels.
   - Uses a compact timing context object instead of per-row timing dictionaries.
@@ -23,8 +23,9 @@ Version 2026.06.07 notes:
   - Reuses a generated bar row's timing values for the matching beat-one row in
     beat-grid exports.
   - Against main on RYM_2026-03.als, final median benchmark results showed no
-    material regression: locator-only improved by about 2.3%, beat-grid core
-    improved by about 4.2%, and full TSV + JSON moved about 1.5% slower.
+    material regression: locator-only improved by about 0.3%, beat-grid core
+    improved by about 0.8%, and full TSV + JSON improved by about 0.5%.
+  - Tested and validated with Ableton Live 12.4.2 sessions.
 
 Version 2026.05.31 notes:
   - Added tag-name fast paths to the XML start and end handlers so unrelated
@@ -249,7 +250,7 @@ import zlib
 
 
 SCRIPT_NAME = "extract_timeline.py"
-SCRIPT_VERSION = "2026.06.07"
+SCRIPT_VERSION = "2026.06.15"
 REPORT_TITLE = "Timeline Extraction Results"
 
 DEFAULT_BPM = 120.0

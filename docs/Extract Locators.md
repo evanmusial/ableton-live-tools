@@ -6,7 +6,7 @@ The script uses only the Python 3 standard library.
 
 ## Current Version
 
-Version: `2026.06.07`
+Version: `2026.06.15`
 
 Author: Evan Musial <evan@evan.engineer>
 
@@ -16,7 +16,7 @@ This license requires that reusers give credit to the creator. It allows reusers
 
 ## Release Notes
 
-### 2026.06.07
+### 2026.06.15
 
 - Added optional MIDI timing-map output with `--midi-timing-map`.
 - When enabled, the Standard MIDI export now includes tempo and time-signature meta events alongside locator marker meta events.
@@ -31,6 +31,7 @@ This license requires that reusers give credit to the creator. It allows reusers
 - Added a validation fixture for `RYM_2026-03_reaper_markers.csv`.
 - Added CLI regression tests for REAPER marker output, MIDI timing-map output, DAW MIDI marker-map presets, and the `--midi-timing-map` / `--midi` argument dependency.
 - Against `main` on `RYM_2026-03.als`, the locator metadata TSV + JSON benchmark stayed flat at a `0.687s` median, confirming no speed regression after the expanded export options.
+- Tested and validated with Ableton Live 12.4.2 sessions.
 
 ### 2026.06.02
 

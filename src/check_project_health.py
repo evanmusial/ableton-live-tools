@@ -2,7 +2,7 @@
 
 """
 check_project_health.py
-Version: 2026.06.07
+Version: 2026.06.15
 
 Author: Evan Musial <evan@evan.engineer>
 License: Creative Commons Attribution-ShareAlike 4.0 International
@@ -14,7 +14,7 @@ License meaning:
   - If others remix, adapt, or build upon the material, they must license the
     modified material under identical terms.
 
-Version 2026.06.07 notes:
+Version 2026.06.15 notes:
   - Initial Project Health Checker release.
   - Reuses the streaming project manifest parser so health checks can run on
     large Ableton Live sets without loading the full uncompressed ALS XML tree.
@@ -23,6 +23,7 @@ Version 2026.06.07 notes:
     sample rates, disabled clips/devices, frozen clips, unknown plugin authors,
     unnamed tracks, and unusually long sample paths.
   - Adds Markdown and JSON output for archival, collaboration, and CI workflows.
+  - Tested and validated with Ableton Live 12.4.2 sessions.
 
 What this script does:
   Project Health Checker reads an Ableton Live .als file and reports conditions
@@ -90,7 +91,7 @@ from extract_project_manifest import (
 
 
 SCRIPT_NAME = "check_project_health.py"
-SCRIPT_VERSION = "2026.06.07"
+SCRIPT_VERSION = "2026.06.15"
 REPORT_TITLE = "Project Health Results"
 LONG_PATH_WARNING_LENGTH = 240
 

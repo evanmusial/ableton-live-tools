@@ -26,7 +26,7 @@ Delivered versions:
 - `2026.05.29`: Compatibility, validation, and performance/output roadmap documentation.
 - `2026.05.31`: XML parser fast paths, direct parent/depth path checks, repeatable CLI validation tests, and repeatable benchmark tooling.
 - `2026.06.02`: Standard CSV export, Adobe Audition marker export with `.csv` filenames containing tab-separated marker rows for Audition import compatibility, WebVTT chapter export, CUE sheet export, Markdown report export, and Standard MIDI locator marker export.
-- `2026.06.07`: REAPER marker CSV export, Logic Pro/Pro Tools/Cubase/Nuendo MIDI marker-map presets, optional Standard MIDI timing-map export with tempo and time-signature meta events, single-pass reuse of parsed timing data for MIDI output, and locator timing-context performance cleanup.
+- `2026.06.15`: REAPER marker CSV export, Logic Pro/Pro Tools/Cubase/Nuendo MIDI marker-map presets, optional Standard MIDI timing-map export with tempo and time-signature meta events, single-pass reuse of parsed timing data for MIDI output, and locator timing-context performance cleanup.
 
 ### Extract Timeline
 
@@ -39,7 +39,7 @@ Delivered versions:
 - `2026.05.21`: Initial timeline extraction with tempo events, tempo ramps, time signatures, detected key/scale entries, locators, clip boundaries, song end, optional bar/beat grids, sample-index calculation, sample-rate/bit-depth metadata, TSV output, JSON output, selectable event types, selectable columns, and `--end-beat`.
 - `2026.05.29`: Compatibility, validation, and performance/output roadmap documentation.
 - `2026.05.31`: XML parser fast paths, target-aware parsing, direct parent/depth path checks, repeatable CLI validation tests, and repeatable benchmark tooling.
-- `2026.06.07`: Timing-context performance cleanup, lazy `details` payload construction, and beat-grid timing reuse.
+- `2026.06.15`: Timing-context performance cleanup, lazy `details` payload construction, and beat-grid timing reuse.
 
 ### Validation And Benchmark Infrastructure
 
@@ -51,7 +51,7 @@ Delivered versions:
 
 - `2026.05.17`: Canonical validation fixtures for `examples/validation/RYM_2026-03.als`.
 - `2026.05.31`: Standard-library `unittest` CLI validation suite and `scripts/benchmark_validation.py` benchmark runner with optional git-ref comparison.
-- `2026.06.07`: MIDI timing-map fixture and regression checks, DAW MIDI marker-map preset checks, Project Manifest semantic checks, Project Health Checker checks, Semantic ALS Diff no-change checks, plus expanded CLI argument-error coverage.
+- `2026.06.15`: MIDI timing-map fixture and regression checks, DAW MIDI marker-map preset checks, Project Manifest semantic checks, Project Health Checker checks, Semantic ALS Diff no-change checks, plus expanded CLI argument-error coverage.
 
 ### Sample & Plugin/Effects Manifest
 
@@ -61,7 +61,7 @@ Create a bill of materials for the Live Set's audio references, native devices, 
 
 Delivered versions:
 
-- `2026.06.07`: Initial `src/extract_project_manifest.py` release with `samples.tsv`, `devices.tsv`, Markdown, JSON, sample usage counts, original file size/CRC fields, default sample rate/duration fields, resolved-path checks, missing-sample status, device/plugin locations, manufacturers, formats, enabled states, placeholder states, and preset names where detectable.
+- `2026.06.15`: Initial `src/extract_project_manifest.py` release with `samples.tsv`, `devices.tsv`, Markdown, JSON, sample usage counts, original file size/CRC fields, default sample rate/duration fields, resolved-path checks, missing-sample status, device/plugin locations, manufacturers, formats, enabled states, placeholder states, and preset names where detectable.
 
 ### Project Inventory
 
@@ -71,7 +71,7 @@ Produce a broad inventory of Ableton project contents.
 
 Delivered versions:
 
-- `2026.06.07`: Initial project inventory report with track counts, clip counts, freeze clip counts, sample counts, missing/existing sample counts, device counts, third-party plugin counts, Ableton native device counts, locator counts, tempo-event counts, time-signature-event counts, `tracks.tsv`, `clips.tsv`, `project_inventory.md`, and full `project_manifest.json`.
+- `2026.06.15`: Initial project inventory report with track counts, clip counts, freeze clip counts, sample counts, missing/existing sample counts, device counts, third-party plugin counts, Ableton native device counts, locator counts, tempo-event counts, time-signature-event counts, `tracks.tsv`, `clips.tsv`, `project_inventory.md`, and full `project_manifest.json`.
 
 ### Plugin Manifest
 
@@ -81,7 +81,7 @@ Extract plugins/effects used in the session, with views sorted by author and by 
 
 Delivered versions:
 
-- `2026.06.07`: Initial plugin/effects manifest through `src/extract_project_manifest.py`, including `plugins_by_author.tsv`, `plugins_by_name.tsv`, JSON plugin views, manufacturer/author fields, format fields, track location, device position, enabled state, placeholder state, and preset names where detectable.
+- `2026.06.15`: Initial plugin/effects manifest through `src/extract_project_manifest.py`, including `plugins_by_author.tsv`, `plugins_by_name.tsv`, JSON plugin views, manufacturer/author fields, format fields, track location, device position, enabled state, placeholder state, and preset names where detectable.
 
 ### Project Health Checker
 
@@ -91,7 +91,7 @@ Inspect an Ableton Live session and report anything that might make the project 
 
 Delivered versions:
 
-- `2026.06.07`: Initial `src/check_project_health.py` release with terminal, Markdown, and JSON reports; configurable `--fail-on=critical|warning|any|none`; critical findings for missing samples and placeholder plugins; warnings for outside-project sample references, mixed sample rates, disabled clips/devices, unknown plugin authors, unnamed tracks, and long sample paths; and info reporting for freeze clips.
+- `2026.06.15`: Initial `src/check_project_health.py` release with terminal, Markdown, and JSON reports; configurable `--fail-on=critical|warning|any|none`; critical findings for missing samples and placeholder plugins; warnings for outside-project sample references, mixed sample rates, disabled clips/devices, unknown plugin authors, unnamed tracks, and long sample paths; and info reporting for freeze clips.
 
 Delivered checks:
 
@@ -126,7 +126,7 @@ Compare two `.als` files and report meaningful musical/project changes instead o
 
 Delivered versions:
 
-- `2026.06.07`: Initial `src/diff_als_semantic.py` release with terminal, Markdown, and JSON reports; script-friendly same/different exit behavior; `--no-fail-on-diff`; summary-count changes; and added/removed comparisons for tracks, clips, samples, devices/plugins, locators, tempo events, and time-signature events.
+- `2026.06.15`: Initial `src/diff_als_semantic.py` release with terminal, Markdown, and JSON reports; script-friendly same/different exit behavior; `--no-fail-on-diff`; summary-count changes; and added/removed comparisons for tracks, clips, samples, devices/plugins, locators, tempo events, and time-signature events.
 
 Delivered comparisons:
 

@@ -6,7 +6,7 @@ The script uses only the Python 3 standard library.
 
 ## Current Version
 
-Version: `2026.06.07`
+Version: `2026.06.15`
 
 Author: Evan Musial <evan@evan.engineer>
 
@@ -16,7 +16,7 @@ This license requires that reusers give credit to the creator. It allows reusers
 
 ## Release Notes
 
-### 2026.06.07
+### 2026.06.15
 
 - Added the initial `src/extract_project_manifest.py` script.
 - Added project inventory output for tracks, clips, samples, devices, Ableton metadata, locators, tempo-event counts, and time-signature-event counts.
@@ -25,6 +25,7 @@ This license requires that reusers give credit to the creator. It allows reusers
 - Added plugin/effects views sorted by author/manufacturer and by plugin/effect name.
 - Added Markdown, JSON, and TSV output in one report directory.
 - Added CLI validation coverage against `examples/validation/RYM_2026-03.als`.
+- Tested and validated with Ableton Live 12.4.2 sessions.
 
 ## What It Does
 

@@ -6,7 +6,7 @@ The script uses only the Python 3 standard library and reuses the existing locat
 
 ## Current Version
 
-Version: `2026.06.07`
+Version: `2026.06.15`
 
 Author: Evan Musial <evan@evan.engineer>
 
@@ -16,7 +16,7 @@ This license requires that reusers give credit to the creator. It allows reusers
 
 ## Release Notes
 
-### 2026.06.07
+### 2026.06.15
 
 - Added the initial Semantic ALS Diff CLI.
 - Compared high-level summary counts between two Ableton Live sessions.
@@ -25,6 +25,7 @@ This license requires that reusers give credit to the creator. It allows reusers
 - Added script-friendly exit behavior: `0` when files are semantically the same, `1` when semantic differences are found, and `2` for command-line argument errors.
 - Added `--no-fail-on-diff` for report-only workflows.
 - Added CLI validation coverage for the identical-file no-change case.
+- Tested and validated with Ableton Live 12.4.2 sessions.
 
 ## What It Does
 
