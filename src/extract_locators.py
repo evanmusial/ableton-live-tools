@@ -2,7 +2,7 @@
 
 """
 extract_locators.py
-Version: 2026.06.02
+Version: 2026.06.15
 
 Author: Evan Musial <evan@evan.engineer>
 License: Creative Commons Attribution-ShareAlike 4.0 International
@@ -13,6 +13,25 @@ License meaning:
     in any medium or format, even for commercial purposes.
   - If others remix, adapt, or build upon the material, they must license the
     modified material under identical terms.
+
+Version 2026.06.15 notes:
+  - Added optional MIDI timing-map output with --midi-timing-map.
+  - When enabled, the Standard MIDI export includes tempo and time-signature
+    meta events alongside locator marker meta events.
+  - Kept the default --midi behavior as a marker-only file for compatibility.
+  - Reuses the already parsed tempo and time-signature maps for MIDI timing
+    output instead of reading the ALS file a second time.
+  - Precomputes time-signature section positions and uses a compact timing
+    context object for a small locator-export performance improvement.
+  - Raises the streaming XML read chunk size from 1 MiB to 4 MiB to reduce
+    parser I/O overhead while keeping memory use low.
+  - Added a validation fixture and CLI regression test for MIDI timing-map
+    output.
+  - Added REAPER marker CSV export with --reaper.
+  - Added DAW-named MIDI marker-map presets for Logic Pro, Pro Tools, Cubase,
+    and Nuendo. These write Standard MIDI files with locator markers plus tempo
+    and time-signature meta events by default.
+  - Tested and validated with Ableton Live 12.4.2 sessions.
 
 Version 2026.06.02 notes:
   - Added Adobe Audition marker export with --audition / -a.
@@ -106,7 +125,11 @@ Features:
   - Can write WebVTT chapter cues.
   - Can write CUE sheets for locator-based track indexes.
   - Can write Markdown locator reports.
+  - Can write REAPER marker CSV files.
   - Can write Standard MIDI files with locator marker meta events.
+  - Can optionally add tempo and time-signature MIDI meta events to Standard
+    MIDI exports.
+  - Can write Logic Pro, Pro Tools, Cubase, and Nuendo MIDI marker-map presets.
   - Can write compact or human-readable JSON.
   - Can customize or omit the TSV heading row.
   - Can add optional locator-position metadata columns.
@@ -344,6 +367,50 @@ Arguments:
       Example:
         python3 src/extract_locators.py song.als --midi=markers.mid
 
+  --reaper=PATH
+      Also write a REAPER marker CSV file.
+
+      The file uses REAPER's Region/Marker Manager CSV columns:
+          #,Name,Start,End,Length
+
+      Locator rows are exported as markers, so End and Length are blank.
+
+      Example:
+        python3 src/extract_locators.py song.als --reaper=markers.csv
+
+  --midi-timing-map
+      Add tempo and time-signature meta events to the Standard MIDI export.
+      Requires --midi. Locator markers remain in the same file.
+
+      Standard MIDI represents tempo with discrete tempo meta events. Ableton
+      linear tempo ramps are therefore exported as their tempo automation
+      points rather than as continuous ramp curves.
+
+      Example:
+        python3 src/extract_locators.py song.als --midi=markers.mid --midi-timing-map
+
+  --logic-midi=PATH
+  --pro-tools-midi=PATH
+  --cubase-midi=PATH
+  --nuendo-midi=PATH
+      Write a DAW-named Standard MIDI marker-map preset.
+
+      These options use the same MIDI marker events as --midi, and they include
+      tempo and time-signature meta events automatically so imported markers can
+      follow Ableton's musical timeline in DAWs that read MIDI marker maps.
+
+      DAW import behavior varies. Some DAWs import markers only into an empty
+      marker/memory-location list, and importing a timing map may affect the
+      receiving session's tempo or meter data. Treat these as marker-map source
+      files and review the DAW's import settings before applying them to an
+      existing production session.
+
+      Examples:
+        python3 src/extract_locators.py song.als --logic-midi=logic_markers.mid
+        python3 src/extract_locators.py song.als --pro-tools-midi=pro_tools_markers.mid
+        python3 src/extract_locators.py song.als --cubase-midi=cubase_markers.mid
+        python3 src/extract_locators.py song.als --nuendo-midi=nuendo_markers.mid
+
   --json=PATH
   -j PATH
       Also write a JSON locator export.
@@ -366,10 +433,13 @@ Combined examples:
   python3 src/extract_locators.py song.als --webvtt=chapters.vtt
   python3 src/extract_locators.py song.als --cue=tracks.cue --cue-audio=render.wav
   python3 src/extract_locators.py song.als --columns=all --markdown=locators.md
+  python3 src/extract_locators.py song.als --reaper=markers.csv
   python3 src/extract_locators.py song.als --midi=markers.mid
+  python3 src/extract_locators.py song.als --midi=markers.mid --midi-timing-map
+  python3 src/extract_locators.py song.als --logic-midi=logic_markers.mid --pro-tools-midi=pro_tools_markers.mid
   python3 src/extract_locators.py song.als --include-tempo --include-song-position --include-time-signature --output=locators.tsv
   python3 src/extract_locators.py song.als --columns=all --json=locators.json
-  python3 src/extract_locators.py song.als --add-offset=27 --strip-keys --output=locators.tsv --mixcloud=mixcloud.txt --csv=locators.csv --audition=audition_markers.csv --webvtt=chapters.vtt --cue=tracks.cue --markdown=locators.md --midi=markers.mid
+  python3 src/extract_locators.py song.als --add-offset=27 --strip-keys --output=locators.tsv --mixcloud=mixcloud.txt --csv=locators.csv --audition=audition_markers.csv --webvtt=chapters.vtt --cue=tracks.cue --markdown=locators.md --reaper=markers.csv --midi=markers.mid
 
 CLI reporting:
   - Reports are headed "Locator Extraction Results".
@@ -392,14 +462,16 @@ from pathlib import Path
 import re
 import sys
 import time
+from typing import NamedTuple
 import xml.parsers.expat as expat
 import zlib
 
 
 SCRIPT_NAME = "extract_locators.py"
-SCRIPT_VERSION = "2026.06.02"
+SCRIPT_VERSION = "2026.06.15"
 REPORT_TITLE = "Locator Extraction Results"
 DEFAULT_BPM = 120.0
+LOCATOR_XML_READ_CHUNK_SIZE = 4 * 1024 * 1024
 TEMPO_AUTOMATION_POINTEE_ID = "8"
 TIME_SIGNATURE_AUTOMATION_POINTEE_ID = "10"
 DEFAULT_TIME_SIGNATURE_VALUE = 201
@@ -451,6 +523,13 @@ AUDITION_MARKER_HEADERS = (
 AUDITION_ZERO_DURATION = "0:00.000"
 AUDITION_TIME_FORMAT = "decimal"
 AUDITION_MARKER_TYPE = "Cue"
+REAPER_MARKER_HEADERS = ("#", "Name", "Start", "End", "Length")
+DAW_MIDI_PRESETS = (
+    ("logic_midi", "Logic Pro Marker Map"),
+    ("pro_tools_midi", "Pro Tools Marker Map"),
+    ("cubase_midi", "Cubase Marker Map"),
+    ("nuendo_midi", "Nuendo Marker Map"),
+)
 WEBVTT_FINAL_CUE_SECONDS = 1.0
 CUE_FRAMES_PER_SECOND = 75
 CUE_DEFAULT_AUDIO_SUFFIX = ".wav"
@@ -458,8 +537,12 @@ MIDI_TICKS_PER_QUARTER_NOTE = 480
 MIDI_FORMAT_SINGLE_TRACK = 0
 MIDI_TRACK_COUNT = 1
 MIDI_MARKER_META_TYPE = 0x06
+MIDI_TEMPO_META_TYPE = 0x51
+MIDI_TIME_SIGNATURE_META_TYPE = 0x58
 MIDI_TRACK_NAME_META_TYPE = 0x03
 MIDI_END_OF_TRACK_META_TYPE = 0x2F
+MIDI_DEFAULT_CLOCKS_PER_METRONOME_CLICK = 24
+MIDI_DEFAULT_32ND_NOTES_PER_QUARTER_NOTE = 8
 
 COLUMN_HEADERS = {
     "time": DEFAULT_TIME_HEADER,
@@ -588,6 +671,18 @@ class TimeSignatureEvent:
     denominator: int
 
 
+class TimeSignatureContext(NamedTuple):
+    """Computed musical-position values for one Ableton beat."""
+
+    event: TimeSignatureEvent
+    bar_number: int
+    displayed_beat: int
+    sixteenth: int
+    song_position: str
+    time_signature: str
+    time_signature_section_start: str
+
+
 @dataclass(frozen=True)
 class LocatorExportRow:
     """All computed values that can be written for a single exported locator."""
@@ -604,6 +699,15 @@ class LocatorExportRow:
     bar_number: int
     time_signature_section_start: str
     track_number: int
+
+
+@dataclass(frozen=True)
+class LocatorExtractionResult:
+    """Locator rows plus the timing map needed by richer export formats."""
+
+    rows: list[LocatorExportRow]
+    tempo_events: tuple[tuple[float, float], ...]
+    time_signature_events: tuple[TimeSignatureEvent, ...]
 
 
 def stream_supports_color(stream):
@@ -851,7 +955,7 @@ def parse_als_locator_data(als_path):
         ) from exc
 
 
-def parse_als_xml_stream(xml_stream, chunk_size=1024 * 1024):
+def parse_als_xml_stream(xml_stream, chunk_size=LOCATOR_XML_READ_CHUNK_SIZE):
     """
     Stream-parse Ableton XML and return raw timing data needed by this tool.
 
@@ -1073,6 +1177,25 @@ def format_audition_time(total_seconds):
     return f"{minutes}:{seconds:02}.{milliseconds:03}"
 
 
+def format_reaper_time(total_seconds):
+    """
+    Format seconds for REAPER Region/Marker Manager CSV import.
+
+    REAPER examples use minute-oriented timestamps such as 0:03.500. When the
+    session is longer than an hour, include an hours field so long-form markers
+    remain unambiguous.
+    """
+    total_milliseconds = max(0, int(round(total_seconds * 1000)))
+    hours, remaining_milliseconds = divmod(total_milliseconds, 3_600_000)
+    minutes, remaining_milliseconds = divmod(remaining_milliseconds, 60_000)
+    seconds, milliseconds = divmod(remaining_milliseconds, 1000)
+
+    if hours:
+        return f"{hours}:{minutes:02}:{seconds:02}.{milliseconds:03}"
+
+    return f"{minutes}:{seconds:02}.{milliseconds:03}"
+
+
 def format_webvtt_time(total_seconds):
     """
     Format seconds as a WebVTT timestamp.
@@ -1179,6 +1302,37 @@ def midi_text_payload(raw_text):
 def midi_tick_for_beat(beat):
     """Convert an Ableton beat position to a Standard MIDI tick position."""
     return max(0, int(round(beat * MIDI_TICKS_PER_QUARTER_NOTE)))
+
+
+def midi_tempo_payload(bpm):
+    """Encode BPM as a MIDI set-tempo payload."""
+    require_positive_bpm(bpm, "midi tempo bpm")
+    microseconds_per_quarter = int(round(60_000_000 / bpm))
+    clamped_value = min(max(1, microseconds_per_quarter), 0xFFFFFF)
+    return clamped_value.to_bytes(3, byteorder="big")
+
+
+def midi_time_signature_payload(time_signature_event):
+    """Encode an Ableton time signature as a MIDI time-signature payload."""
+    try:
+        denominator_power = TIME_SIGNATURE_DENOMINATORS.index(
+            time_signature_event.denominator
+        )
+    except ValueError as exc:
+        raise LocatorToolError(
+            "Ableton file contains a time-signature denominator MIDI cannot encode.",
+            [("denominator", time_signature_event.denominator)],
+        ) from exc
+
+    numerator = max(1, min(255, int(time_signature_event.numerator)))
+    return bytes(
+        (
+            numerator,
+            denominator_power,
+            MIDI_DEFAULT_CLOCKS_PER_METRONOME_CLICK,
+            MIDI_DEFAULT_32ND_NOTES_PER_QUARTER_NOTE,
+        )
+    )
 
 
 def normalized_tempo_events(tempo_changes):
@@ -1399,42 +1553,51 @@ def build_time_signature_context(time_signature_events):
 
         return event_index, bar_number, displayed_beat, sixteenth
 
-    def format_song_position(beat):
-        _event_index, bar_number, displayed_beat, sixteenth = position_parts_at_beat(
-            beat
-        )
+    def format_position_parts(bar_number, displayed_beat, sixteenth):
         return f"{bar_number}.{displayed_beat}.{sixteenth}"
 
-    def context_at_beat(beat):
-        event_index, bar_number, _displayed_beat, _sixteenth = position_parts_at_beat(
-            beat
-        )
-        event = time_signature_events[event_index]
-        section_start = format_song_position(event.beat)
+    section_start_positions = []
 
-        return {
-            "event": event,
-            "bar_number": bar_number,
-            "song_position": format_song_position(beat),
-            "time_signature": f"{event.numerator}/{event.denominator}",
-            "time_signature_section_start": section_start,
-        }
+    for event in time_signature_events:
+        _event_index, bar_number, displayed_beat, sixteenth = position_parts_at_beat(
+            event.beat
+        )
+        section_start_positions.append(
+            format_position_parts(bar_number, displayed_beat, sixteenth)
+        )
+
+    def context_at_beat(beat):
+        event_index, bar_number, displayed_beat, sixteenth = position_parts_at_beat(beat)
+        event = time_signature_events[event_index]
+
+        return TimeSignatureContext(
+            event=event,
+            bar_number=bar_number,
+            displayed_beat=displayed_beat,
+            sixteenth=sixteenth,
+            song_position=format_position_parts(bar_number, displayed_beat, sixteenth),
+            time_signature=f"{event.numerator}/{event.denominator}",
+            time_signature_section_start=section_start_positions[event_index],
+        )
 
     return context_at_beat
 
 
-def extract_locator_rows(
+def extract_locator_data(
     als_path,
     add_offset=0.0,
     strip_keys=False,
     track_number_offset=0,
 ):
     """
-    Extract locators and compute every supported export field.
+    Extract locators, export fields, and the session timing map.
 
     The output timestamp remains the familiar normalized time plus any user
     offset. Metadata columns keep their own meanings: absolute values refer to
-    the session timeline, and normalized_seconds excludes the user offset.
+    the session timeline, and normalized_seconds excludes the user offset. The
+    normalized tempo and time-signature events travel with the rows so optional
+    export formats can reuse the already parsed ALS timing data instead of
+    reading the session file a second time.
     """
     (
         raw_tempo_changes,
@@ -1477,7 +1640,11 @@ def extract_locator_rows(
         )
 
     if not prepared_locators:
-        return []
+        return LocatorExtractionResult(
+            rows=[],
+            tempo_events=tuple(tempo_changes),
+            time_signature_events=tuple(time_signature_events),
+        )
 
     rows = []
 
@@ -1496,19 +1663,19 @@ def extract_locator_rows(
                 absolute_seconds=prepared_locator["absolute_seconds"],
                 normalized_seconds=normalized_seconds,
                 tempo_bpm=prepared_locator["tempo_bpm"],
-                song_position=timing_context["song_position"],
-                time_signature=timing_context["time_signature"],
-                bar_number=timing_context["bar_number"],
-                time_signature_section_start=timing_context[
-                    "time_signature_section_start"
-                ],
+                song_position=timing_context.song_position,
+                time_signature=timing_context.time_signature,
+                bar_number=timing_context.bar_number,
+                time_signature_section_start=(
+                    timing_context.time_signature_section_start
+                ),
                 track_number=0,
             )
         )
 
     rows.sort(key=lambda item: item.output_seconds)
 
-    return [
+    numbered_rows = [
         LocatorExportRow(
             output_seconds=row.output_seconds,
             name=row.name,
@@ -1525,6 +1692,32 @@ def extract_locator_rows(
         )
         for index, row in enumerate(rows, start=1)
     ]
+
+    return LocatorExtractionResult(
+        rows=numbered_rows,
+        tempo_events=tuple(tempo_changes),
+        time_signature_events=tuple(time_signature_events),
+    )
+
+
+def extract_locator_rows(
+    als_path,
+    add_offset=0.0,
+    strip_keys=False,
+    track_number_offset=0,
+):
+    """
+    Extract locators and compute every supported export field.
+
+    This compatibility wrapper preserves the existing list return value for
+    callers that do not need the parsed tempo or time-signature maps.
+    """
+    return extract_locator_data(
+        als_path,
+        add_offset=add_offset,
+        strip_keys=strip_keys,
+        track_number_offset=track_number_offset,
+    ).rows
 
 
 def extract_locators_with_ramps(als_path, add_offset=0.0, strip_keys=False):
@@ -1821,6 +2014,43 @@ def write_audition_markers(rows, audition_path):
         ) from exc
 
 
+def write_reaper_markers(rows, reaper_path):
+    """
+    Write a REAPER Region/Marker Manager CSV file.
+
+    REAPER distinguishes point markers from regions by the first column. Marker
+    IDs start with M, while regions start with R. Locator exports are point
+    markers, so End and Length are intentionally blank.
+    """
+    ensure_parent_directory(reaper_path)
+
+    try:
+        with reaper_path.open("w", encoding="utf-8", newline="") as out:
+            writer = csv.writer(out, lineterminator="\n")
+            writer.writerow(REAPER_MARKER_HEADERS)
+
+            for index, row in enumerate(rows, start=1):
+                writer.writerow(
+                    (
+                        f"M{index}",
+                        single_line_text(row.name),
+                        format_reaper_time(row.output_seconds),
+                        "",
+                        "",
+                    )
+                )
+    except PermissionError as exc:
+        raise LocatorToolError(
+            "Permission denied while writing the REAPER marker CSV file.",
+            [("path", display_path(reaper_path))],
+        ) from exc
+    except OSError as exc:
+        raise LocatorToolError(
+            "Unable to write the REAPER marker CSV file.",
+            [("path", display_path(reaper_path)), ("detail", exc)],
+        ) from exc
+
+
 def write_webvtt_chapters(rows, webvtt_path):
     """
     Write locators as WebVTT chapter cues.
@@ -1982,39 +2212,87 @@ def write_markdown_report(
         ) from exc
 
 
-def write_midi_markers(rows, midi_path):
+def write_midi_markers(
+    rows,
+    midi_path,
+    tempo_events=(),
+    time_signature_events=(),
+    include_timing_map=False,
+    track_name=None,
+):
     """
     Write locator names as Standard MIDI marker meta events.
 
     MIDI files are beat/tick-based, so markers use each locator's absolute
-    Ableton beat position. Text timestamp offsets do not apply here.
+    Ableton beat position. Text timestamp offsets do not apply here. When the
+    optional timing map is enabled, tempo and time-signature meta events are
+    written at their absolute Ableton beat positions in the same single track.
     """
     ensure_parent_directory(midi_path)
 
     try:
         track_events = bytearray()
+        if track_name is None:
+            track_name = (
+                "Ableton Live Locator Timing Map"
+                if include_timing_map
+                else "Ableton Live Locators"
+            )
         track_events.extend(
             midi_meta_event(
                 0,
                 MIDI_TRACK_NAME_META_TYPE,
-                midi_text_payload("Ableton Live Locators"),
+                midi_text_payload(track_name),
             )
         )
 
-        previous_tick = 0
+        scheduled_events = []
+
+        if include_timing_map:
+            for beat, bpm in tempo_events:
+                scheduled_events.append(
+                    (
+                        midi_tick_for_beat(beat),
+                        10,
+                        MIDI_TEMPO_META_TYPE,
+                        midi_tempo_payload(bpm),
+                    )
+                )
+
+            for signature_event in time_signature_events:
+                scheduled_events.append(
+                    (
+                        midi_tick_for_beat(signature_event.beat),
+                        20,
+                        MIDI_TIME_SIGNATURE_META_TYPE,
+                        midi_time_signature_payload(signature_event),
+                    )
+                )
 
         sorted_rows = sorted(rows, key=lambda item: item.absolute_beats)
 
         for index, row in enumerate(sorted_rows, start=1):
-            tick = midi_tick_for_beat(row.absolute_beats)
+            marker_name = row.name or f"Locator {index}"
+            scheduled_events.append(
+                (
+                    midi_tick_for_beat(row.absolute_beats),
+                    30,
+                    MIDI_MARKER_META_TYPE,
+                    midi_text_payload(marker_name),
+                )
+            )
+
+        scheduled_events.sort(key=lambda item: (item[0], item[1]))
+        previous_tick = 0
+
+        for tick, _priority, meta_type, payload in scheduled_events:
             delta_ticks = max(0, tick - previous_tick)
             previous_tick = tick
-            marker_name = row.name or f"Locator {index}"
             track_events.extend(
                 midi_meta_event(
                     delta_ticks,
-                    MIDI_MARKER_META_TYPE,
-                    midi_text_payload(marker_name),
+                    meta_type,
+                    payload,
                 )
             )
 
@@ -2215,10 +2493,16 @@ def parse_args():
             "  python3 src/extract_locators.py song.als --webvtt=chapters.vtt\n"
             "  python3 src/extract_locators.py song.als --cue=tracks.cue --cue-audio=render.wav\n"
             "  python3 src/extract_locators.py song.als --columns=all --markdown=locators.md\n"
+            "  python3 src/extract_locators.py song.als --reaper=markers.csv\n"
             "  python3 src/extract_locators.py song.als --midi=markers.mid\n"
+            "  python3 src/extract_locators.py song.als --midi=markers.mid --midi-timing-map\n"
+            "  python3 src/extract_locators.py song.als --logic-midi=logic_markers.mid\n"
+            "  python3 src/extract_locators.py song.als --pro-tools-midi=pro_tools_markers.mid\n"
+            "  python3 src/extract_locators.py song.als --cubase-midi=cubase_markers.mid\n"
+            "  python3 src/extract_locators.py song.als --nuendo-midi=nuendo_markers.mid\n"
             "  python3 src/extract_locators.py song.als --columns=all --json=locators.json\n"
             "  python3 src/extract_locators.py song.als --json=locators.json --json-format=compact\n"
-            "  python3 src/extract_locators.py song.als --add-offset=27 --strip-keys --output=locators.tsv --mixcloud=mixcloud.txt --csv=locators.csv --audition=audition_markers.csv --webvtt=chapters.vtt --cue=tracks.cue --markdown=locators.md --midi=markers.mid"
+            "  python3 src/extract_locators.py song.als --add-offset=27 --strip-keys --output=locators.tsv --mixcloud=mixcloud.txt --csv=locators.csv --audition=audition_markers.csv --webvtt=chapters.vtt --cue=tracks.cue --markdown=locators.md --reaper=markers.csv --midi=markers.mid"
         ),
     )
 
@@ -2403,9 +2687,45 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--reaper",
+        metavar="PATH",
+        help="Also write a REAPER Region/Marker Manager marker CSV file to PATH.",
+    )
+
+    parser.add_argument(
         "--midi",
         metavar="PATH",
         help="Also write a Standard MIDI file with locator marker events to PATH.",
+    )
+
+    parser.add_argument(
+        "--midi-timing-map",
+        action="store_true",
+        help="Add tempo and time-signature meta events to the Standard MIDI export. Requires --midi.",
+    )
+
+    parser.add_argument(
+        "--logic-midi",
+        metavar="PATH",
+        help="Also write a Logic Pro Standard MIDI marker map with tempo and time-signature events to PATH.",
+    )
+
+    parser.add_argument(
+        "--pro-tools-midi",
+        metavar="PATH",
+        help="Also write a Pro Tools Standard MIDI marker map with tempo and time-signature events to PATH.",
+    )
+
+    parser.add_argument(
+        "--cubase-midi",
+        metavar="PATH",
+        help="Also write a Cubase Standard MIDI marker map with tempo and time-signature events to PATH.",
+    )
+
+    parser.add_argument(
+        "--nuendo-midi",
+        metavar="PATH",
+        help="Also write a Nuendo Standard MIDI marker map with tempo and time-signature events to PATH.",
     )
 
     parser.add_argument(
@@ -2440,6 +2760,9 @@ def parse_args():
     if args.cue_audio is not None and args.cue is None:
         parser.error("--cue-audio requires --cue")
 
+    if args.midi_timing_map and args.midi is None:
+        parser.error("--midi-timing-map requires --midi")
+
     return args
 
 
@@ -2454,18 +2777,25 @@ def run(args):
     cue_path = user_path(args.cue) if args.cue else None
     cue_audio = str(Path(args.cue_audio).expanduser()) if args.cue_audio else None
     markdown_path = user_path(args.markdown) if args.markdown else None
+    reaper_path = user_path(args.reaper) if args.reaper else None
     midi_path = user_path(args.midi) if args.midi else None
+    daw_midi_outputs = [
+        (user_path(getattr(args, option_name)), track_name)
+        for option_name, track_name in DAW_MIDI_PRESETS
+        if getattr(args, option_name)
+    ]
     json_path = user_path(args.json) if args.json else None
     columns = selected_columns_from_args(args)
 
     started_at = time.perf_counter()
 
-    locator_rows = extract_locator_rows(
+    extraction = extract_locator_data(
         als_path,
         add_offset=args.add_offset,
         strip_keys=args.strip_keys,
         track_number_offset=args.track_number_offset,
     )
+    locator_rows = extraction.rows
 
     if not locator_rows:
         return {
@@ -2552,9 +2882,30 @@ def run(args):
         )
         rows.append(("output", display_path(markdown_path)))
 
+    if reaper_path:
+        write_reaper_markers(locator_rows, reaper_path=reaper_path)
+        rows.append(("output", display_path(reaper_path)))
+
     if midi_path:
-        write_midi_markers(locator_rows, midi_path=midi_path)
+        write_midi_markers(
+            locator_rows,
+            midi_path=midi_path,
+            tempo_events=extraction.tempo_events,
+            time_signature_events=extraction.time_signature_events,
+            include_timing_map=args.midi_timing_map,
+        )
         rows.append(("output", display_path(midi_path)))
+
+    for daw_midi_path, track_name in daw_midi_outputs:
+        write_midi_markers(
+            locator_rows,
+            midi_path=daw_midi_path,
+            tempo_events=extraction.tempo_events,
+            time_signature_events=extraction.time_signature_events,
+            include_timing_map=True,
+            track_name=track_name,
+        )
+        rows.append(("output", display_path(daw_midi_path)))
 
     if json_path:
         write_json_export(

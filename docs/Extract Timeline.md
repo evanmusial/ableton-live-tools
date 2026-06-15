@@ -6,7 +6,7 @@ The script uses only the Python 3 standard library.
 
 ## Current Version
 
-Version: `2026.05.31`
+Version: `2026.06.15`
 
 Author: Evan Musial <evan@evan.engineer>
 
@@ -15,6 +15,18 @@ License: Creative Commons Attribution-ShareAlike 4.0 International
 This license requires that reusers give credit to the creator. It allows reusers to distribute, remix, adapt, and build upon the material in any medium or format, even for commercial purposes. If others remix, adapt, or build upon the material, they must license the modified material under identical terms.
 
 ## Release Notes
+
+### 2026.06.15
+
+- Precomputed time-signature section-start positions so repeated timeline rows do not recalculate section-start labels.
+- Changed timeline timing context from dictionaries to a compact named tuple.
+- Built optional `details` dictionaries only when the selected output columns include `details`.
+- Reused generated bar-row timing values for matching beat-one rows in beat-grid exports.
+- Against `main` on `RYM_2026-03.als`, the locator-only benchmark improved from `0.701s` to `0.699s`, about `0.3%` faster.
+- Against `main` on `RYM_2026-03.als`, the beat-grid core benchmark improved from `0.766s` to `0.760s`, about `0.8%` faster.
+- Against `main` on `RYM_2026-03.als`, the full TSV + JSON benchmark improved from `0.786s` to `0.782s`, about `0.5%` faster.
+- Confirmed the expanded standard-library CLI validation suite passes with fourteen checks.
+- Tested and validated with Ableton Live 12.4.2 sessions.
 
 ### 2026.05.31
 

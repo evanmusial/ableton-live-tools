@@ -17,10 +17,14 @@ The first test layer focuses on stable user-visible behavior:
 
 - `extract_locators.py` high-resolution TSV and Mixcloud output.
 - `extract_locators.py` metadata TSV and JSON output.
-- `extract_locators.py` standard CSV, WebVTT chapter, and CUE sheet output.
-- `extract_locators.py` Markdown report and Standard MIDI marker output.
+- `extract_locators.py` standard CSV, WebVTT chapter, CUE sheet, and REAPER marker CSV output.
+- `extract_locators.py` Markdown report, Standard MIDI marker output, and optional MIDI timing-map output.
+- `extract_locators.py` Logic Pro, Pro Tools, Cubase, and Nuendo Standard MIDI marker-map preset output.
 - `extract_locators.py` Adobe Audition marker output, including its `.csv` filename with tab-separated contents.
 - `extract_timeline.py` locator rows compared against locator metadata.
+- `extract_project_manifest.py` Markdown, JSON, and TSV output presence plus semantic inventory counts.
+- `check_project_health.py` Markdown and JSON report output plus expected missing-sample findings.
+- `diff_als_semantic.py` Markdown and JSON output for an identical-file no-change comparison.
 - Missing input files returning error exit code `1`.
 - Command-line argument errors returning exit code `2`.
 
