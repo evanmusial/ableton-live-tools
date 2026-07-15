@@ -2,7 +2,7 @@
 
 """
 extract_project_manifest.py
-Version: 2026.06.15
+Version: 2026.07.14
 
 Author: Evan Musial <evan@evan.engineer>
 License: Creative Commons Attribution-ShareAlike 4.0 International
@@ -13,6 +13,17 @@ License meaning:
     in any medium or format, even for commercial purposes.
   - If others remix, adapt, or build upon the material, they must license the
     modified material under identical terms.
+
+Version 2026.07.14 notes:
+  - Confirms compatibility with Ableton Live 12.4.3 through the full CLI
+    compatibility suite.
+  - Adds a unified file-backed asset inventory for samples, preset files, Max for
+    Live devices, video/media files, source references, and other file-backed
+    project references.
+  - Adds assets.tsv plus a structured assets array and asset counts in the JSON
+    manifest and Markdown inventory.
+  - Records asset reference types, usage counts, tracks, devices, local path
+    resolution, existence, and whether each asset is inside the project folder.
 
 Version 2026.06.15 notes:
   - Initial Project Manifest release.
@@ -45,6 +56,7 @@ Default output:
     project_manifest.json
     tracks.tsv
     clips.tsv
+    assets.tsv
     samples.tsv
     devices.tsv
     plugins_by_author.tsv
@@ -126,6 +138,28 @@ PLUGIN_INFO_FORMATS = {
     "Vst3PluginInfo": "VST3",
     "PluginInfo": "Plugin",
 }
+PRESET_EXTENSIONS = {
+    ".adg",
+    ".adv",
+    ".agr",
+    ".alc",
+    ".alp",
+    ".aupreset",
+    ".fxb",
+    ".fxp",
+    ".vstpreset",
+}
+AUDIO_EXTENSIONS = {
+    ".aif",
+    ".aiff",
+    ".caf",
+    ".flac",
+    ".m4a",
+    ".mp3",
+    ".ogg",
+    ".wav",
+}
+VIDEO_EXTENSIONS = {".avi", ".m4v", ".mov", ".mp4", ".mpeg", ".mpg"}
 
 ANSI_RESET = "\033[0m"
 ANSI_BOLD = "\033[1m"
@@ -220,6 +254,25 @@ class SampleRecord:
 
 
 @dataclass
+class AssetRecord:
+    """Unique file-backed project asset aggregated across ALS references."""
+
+    key: str
+    asset_type: str
+    path: str = ""
+    relative_path: str = ""
+    original_file_size: str = ""
+    original_crc: str = ""
+    usage_count: int = 0
+    reference_types: set = field(default_factory=set)
+    tracks: set = field(default_factory=set)
+    devices: set = field(default_factory=set)
+    resolved_path: str = ""
+    exists: bool = False
+    inside_project: bool = False
+
+
+@dataclass
 class DeviceRecord:
     """One device, native effect, plugin, or Max for Live device."""
 
@@ -255,6 +308,7 @@ class ProjectManifest:
     tracks: list = field(default_factory=list)
     clips: list = field(default_factory=list)
     samples: dict = field(default_factory=dict)
+    assets: dict = field(default_factory=dict)
     devices: list = field(default_factory=list)
 
 
@@ -379,13 +433,18 @@ def display_device_type(device_type):
 
 def candidate_sample_paths(clip, als_path):
     """Return possible filesystem paths for one audio clip source."""
+    return candidate_asset_paths(clip.path, clip.relative_path, als_path)
+
+
+def candidate_asset_paths(path, relative_path, als_path):
+    """Return possible filesystem paths for one file-backed project asset."""
     candidates = []
 
-    if clip.path:
-        candidates.append(Path(clip.path).expanduser())
+    if path:
+        candidates.append(Path(path).expanduser())
 
-    if clip.relative_path:
-        relative = Path(clip.relative_path)
+    if relative_path:
+        relative = Path(relative_path)
         candidates.append(relative if relative.is_absolute() else als_path.parent / relative)
 
     deduped = []
@@ -399,6 +458,121 @@ def candidate_sample_paths(clip, als_path):
         seen.add(key)
 
     return deduped
+
+
+def path_is_inside(candidate, root):
+    """Return True when candidate is inside root, with Python 3.9 support."""
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def asset_type_for(reference_type, path, relative_path):
+    """Classify a FileRef using its ALS context and filename extension."""
+    suffix = Path(path or relative_path).suffix.lower()
+
+    if reference_type == "SampleRef":
+        return "sample"
+    if suffix == ".amxd":
+        return "max_for_live_device"
+    if "PresetRef" in reference_type or suffix in PRESET_EXTENSIONS:
+        return "preset"
+    if suffix in VIDEO_EXTENSIONS:
+        return "video"
+    if suffix in AUDIO_EXTENSIONS:
+        return "audio"
+    if reference_type == "OriginalFileRef":
+        return "source_reference"
+    return "file_reference"
+
+
+def asset_key_for_reference(asset):
+    """Build a stable dedupe key for one file-backed asset reference."""
+    return "\x1f".join(
+        (
+            asset.asset_type,
+            asset.path,
+            asset.relative_path,
+            asset.original_file_size,
+            asset.original_crc,
+        )
+    )
+
+
+def nearest_device_record(element, parent_map, device_records):
+    """Return the nearest containing device record for an XML element."""
+    current = parent_map.get(element)
+
+    while current is not None:
+        if current in device_records:
+            return device_records[current]
+        current = parent_map.get(current)
+
+    return None
+
+
+def asset_record_from_file_ref(file_ref, track, parent_map, device_records):
+    """Convert one non-empty ALS FileRef into an AssetRecord."""
+    parent = parent_map.get(file_ref)
+    reference_type = parent.tag if parent is not None else "FileRef"
+    path = value_at(file_ref, "./Path")
+    relative_path = value_at(file_ref, "./RelativePath")
+    original_file_size = value_at(file_ref, "./OriginalFileSize")
+    original_crc = value_at(file_ref, "./OriginalCrc")
+
+    has_path = bool(path or relative_path)
+    if not has_path and reference_type != "SampleRef":
+        return None
+    if not (has_path or original_file_size or original_crc):
+        return None
+
+    asset = AssetRecord(
+        key="",
+        asset_type=asset_type_for(reference_type, path, relative_path),
+        path=path,
+        relative_path=relative_path,
+        original_file_size=original_file_size,
+        original_crc=original_crc,
+        usage_count=1,
+        reference_types={reference_type},
+        tracks={track.name},
+    )
+    device = nearest_device_record(file_ref, parent_map, device_records)
+    if device is not None:
+        asset.devices.add(device.name)
+
+    asset.key = asset_key_for_reference(asset)
+    return asset
+
+
+def streamed_asset_record(file_ref, reference_type, track_name):
+    """Convert a FileRef outside parsed track subtrees into an AssetRecord."""
+    path = value_at(file_ref, "./Path")
+    relative_path = value_at(file_ref, "./RelativePath")
+    original_file_size = value_at(file_ref, "./OriginalFileSize")
+    original_crc = value_at(file_ref, "./OriginalCrc")
+    has_path = bool(path or relative_path)
+
+    if not has_path and reference_type != "SampleRef":
+        return None
+    if not (has_path or original_file_size or original_crc):
+        return None
+
+    asset = AssetRecord(
+        key="",
+        asset_type=asset_type_for(reference_type, path, relative_path),
+        path=path,
+        relative_path=relative_path,
+        original_file_size=original_file_size,
+        original_crc=original_crc,
+        usage_count=1,
+        reference_types={reference_type},
+        tracks={track_name} if track_name else set(),
+    )
+    asset.key = asset_key_for_reference(asset)
+    return asset
 
 
 def sample_key_for_clip(clip):
@@ -540,6 +714,8 @@ def parse_track_element(track_element, track_index, als_path):
     clips = []
     devices = []
     sample_updates = []
+    asset_updates = []
+    device_records = {}
 
     for clip in track_element.iter():
         if clip.tag not in CLIP_TAGS:
@@ -599,14 +775,24 @@ def parse_track_element(track_element, track_index, als_path):
     for devices_element in track_element.iter("Devices"):
         for device in list(devices_element):
             device_index = len(devices) + 1
-            devices.append(
-                device_record_from_element(
-                    device,
-                    track,
-                    device_index,
-                    parent_map,
-                )
+            record = device_record_from_element(
+                device,
+                track,
+                device_index,
+                parent_map,
             )
+            devices.append(record)
+            device_records[device] = record
+
+    for file_ref in track_element.iter("FileRef"):
+        asset = asset_record_from_file_ref(
+            file_ref,
+            track,
+            parent_map,
+            device_records,
+        )
+        if asset is not None:
+            asset_updates.append(asset)
 
     track.clip_count = len(clips)
     track.device_count = len(devices)
@@ -615,7 +801,7 @@ def parse_track_element(track_element, track_index, als_path):
     )
     track.native_device_count = track.device_count - track.plugin_count
 
-    return track, clips, devices, sample_updates
+    return track, clips, devices, sample_updates, asset_updates
 
 
 def update_sample_manifest(samples, clip, als_path):
@@ -646,6 +832,43 @@ def update_sample_manifest(samples, clip, als_path):
     sample.usage_count += 1
     sample.tracks.add(clip.track_name)
     sample.clips.add(clip.name)
+
+
+def resolve_asset_record(asset, als_path):
+    """Resolve one unique asset after repeated references have been aggregated."""
+    candidates = candidate_asset_paths(asset.path, asset.relative_path, als_path)
+    selected = next(
+        (candidate for candidate in candidates if candidate.exists() and candidate.is_file()),
+        candidates[0] if candidates else None,
+    )
+    if selected is None:
+        return
+
+    normalized = selected.resolve(strict=False)
+    asset.resolved_path = str(normalized)
+    asset.exists = selected.exists() and selected.is_file()
+    asset.inside_project = path_is_inside(
+        normalized,
+        als_path.parent.resolve(strict=False),
+    )
+
+
+def update_asset_manifest(assets, asset, als_path):
+    """Merge one FileRef occurrence into the unique asset inventory."""
+    if asset.key not in assets:
+        resolve_asset_record(asset, als_path)
+        assets[asset.key] = asset
+        return
+
+    existing = assets[asset.key]
+    existing.usage_count += asset.usage_count
+    existing.reference_types.update(asset.reference_types)
+    existing.tracks.update(asset.tracks)
+    existing.devices.update(asset.devices)
+    if not existing.resolved_path and asset.resolved_path:
+        existing.resolved_path = asset.resolved_path
+    existing.exists = existing.exists or asset.exists
+    existing.inside_project = existing.inside_project or asset.inside_project
 
 
 def parse_locator_timing_counts(als_path):
@@ -724,11 +947,13 @@ def parse_project_manifest(als_path):
 
                         if is_top_level_track:
                             track_index += 1
-                            track, clips, devices, sample_updates = parse_track_element(
-                                element,
-                                track_index,
-                                als_path,
-                            )
+                            (
+                                track,
+                                clips,
+                                devices,
+                                sample_updates,
+                                asset_updates,
+                            ) = parse_track_element(element, track_index, als_path)
                             manifest.tracks.append(track)
                             manifest.clips.extend(clips)
                             manifest.devices.extend(devices)
@@ -736,14 +961,37 @@ def parse_project_manifest(als_path):
                             for clip in sample_updates:
                                 update_sample_manifest(manifest.samples, clip, als_path)
 
+                            for asset in asset_updates:
+                                update_asset_manifest(manifest.assets, asset, als_path)
+
                         active_track_depth = None
                         path.pop()
                         element.clear()
                         continue
 
+                    if element.tag == "FileRef" and active_track_depth is None:
+                        reference_type = path[-2] if len(path) >= 2 else "FileRef"
+                        track_name = ""
+                        if "MainTrack" in path:
+                            track_name = "Main Track"
+                        elif "PreHearTrack" in path:
+                            track_name = "PreHear Track"
+                        asset = streamed_asset_record(
+                            element,
+                            reference_type,
+                            track_name,
+                        )
+                        if asset is not None:
+                            update_asset_manifest(manifest.assets, asset, als_path)
+
+                    preserve_for_file_ref = (
+                        active_track_depth is None
+                        and len(path) >= 2
+                        and path[-2] == "FileRef"
+                    )
                     path.pop()
 
-                    if active_track_depth is None:
+                    if active_track_depth is None and not preserve_for_file_ref:
                         element.clear()
     except FileNotFoundError as exc:
         raise ProjectManifestError(
@@ -786,6 +1034,19 @@ def sample_records(manifest):
     )
 
 
+def asset_records(manifest):
+    """Return assets in stable type/path order."""
+    return sorted(
+        manifest.assets.values(),
+        key=lambda asset: (
+            asset.asset_type,
+            asset.path.lower(),
+            asset.relative_path.lower(),
+            asset.original_crc,
+        ),
+    )
+
+
 def plugin_records(manifest):
     """Return plugin/effect manifest records, including native Ableton devices."""
     return list(manifest.devices)
@@ -820,6 +1081,7 @@ def plugins_by_name(manifest):
 def summary_payload(manifest):
     """Return high-level project counts."""
     sample_list = sample_records(manifest)
+    assets = asset_records(manifest)
     devices = plugin_records(manifest)
     third_party = [item for item in devices if item.category == "third_party_plugin"]
     native = [item for item in devices if item.category != "third_party_plugin"]
@@ -839,6 +1101,15 @@ def summary_payload(manifest):
         "unique_sample_count": len(sample_list),
         "missing_sample_count": sum(1 for item in sample_list if not item.exists),
         "existing_sample_count": sum(1 for item in sample_list if item.exists),
+        "asset_reference_count": sum(item.usage_count for item in assets),
+        "unique_asset_count": len(assets),
+        "sample_asset_count": sum(1 for item in assets if item.asset_type == "sample"),
+        "preset_asset_count": sum(1 for item in assets if item.asset_type == "preset"),
+        "max_for_live_asset_count": sum(
+            1 for item in assets if item.asset_type == "max_for_live_device"
+        ),
+        "missing_asset_count": sum(1 for item in assets if not item.exists),
+        "external_asset_count": sum(1 for item in assets if not item.inside_project),
         "device_count": len(devices),
         "third_party_plugin_count": len(third_party),
         "ableton_native_device_count": len(native),
@@ -908,6 +1179,24 @@ def sample_to_dict(sample):
     }
 
 
+def asset_to_dict(asset):
+    """Convert an asset record to a JSON-friendly dict."""
+    return {
+        "asset_type": asset.asset_type,
+        "path": asset.path,
+        "relative_path": asset.relative_path,
+        "original_file_size": asset.original_file_size,
+        "original_crc": asset.original_crc,
+        "usage_count": asset.usage_count,
+        "reference_types": sorted(asset.reference_types),
+        "tracks": sorted(asset.tracks),
+        "devices": sorted(asset.devices),
+        "resolved_path": asset.resolved_path,
+        "exists": asset.exists,
+        "inside_project": asset.inside_project,
+    }
+
+
 def device_to_dict(device):
     """Convert a device record to a JSON-friendly dict."""
     return {
@@ -946,6 +1235,7 @@ def manifest_payload(manifest):
         "summary": summary_payload(manifest),
         "tracks": [track_to_dict(item) for item in manifest.tracks],
         "clips": [clip_to_dict(item) for item in manifest.clips],
+        "assets": [asset_to_dict(item) for item in asset_records(manifest)],
         "samples": [sample_to_dict(item) for item in sample_records(manifest)],
         "devices": [device_to_dict(item) for item in manifest.devices],
         "plugins_by_author": [device_to_dict(item) for item in plugins_by_author(manifest)],
@@ -1059,6 +1349,43 @@ def write_tsv_outputs(manifest, output_dir):
         ],
     )
     outputs.append(clips_path)
+
+    assets_path = output_dir / "assets.tsv"
+    write_tsv(
+        assets_path,
+        (
+            "Asset Type",
+            "Path",
+            "Relative Path",
+            "Original File Size",
+            "Original CRC",
+            "Usage Count",
+            "Reference Types",
+            "Tracks",
+            "Devices",
+            "Resolved Path",
+            "Exists",
+            "Inside Project",
+        ),
+        [
+            (
+                item.asset_type,
+                item.path,
+                item.relative_path,
+                item.original_file_size,
+                item.original_crc,
+                item.usage_count,
+                "; ".join(sorted(item.reference_types)),
+                "; ".join(sorted(item.tracks)),
+                "; ".join(sorted(item.devices)),
+                item.resolved_path,
+                "true" if item.exists else "false",
+                "true" if item.inside_project else "false",
+            )
+            for item in asset_records(manifest)
+        ],
+    )
+    outputs.append(assets_path)
 
     samples_path = output_dir / "samples.tsv"
     write_tsv(
@@ -1229,6 +1556,16 @@ def write_markdown_report(manifest, path):
         (item.manufacturer, item.name, item.format, item.track_name)
         for item in plugins_by_author(manifest)[:20]
     ]
+    asset_rows = [
+        (
+            item.asset_type,
+            item.usage_count,
+            item.path or item.relative_path or item.original_crc,
+            "yes" if item.exists else "no",
+            "yes" if item.inside_project else "no",
+        )
+        for item in asset_records(manifest)[:20]
+    ]
     sample_rows = [
         (
             item.usage_count,
@@ -1259,6 +1596,13 @@ def write_markdown_report(manifest, path):
         "## First Plugin/Effect Rows",
         "",
         markdown_table(("Author", "Name", "Format", "Track"), device_rows),
+        "",
+        "## First Asset Rows",
+        "",
+        markdown_table(
+            ("Type", "Uses", "Asset", "Exists", "Inside Project"),
+            asset_rows,
+        ),
         "",
         "## First Sample Rows",
         "",
@@ -1308,7 +1652,7 @@ def write_json_report(manifest, path, json_format):
 def parse_args():
     """Parse and validate command-line arguments."""
     parser = ManifestArgumentParser(
-        description="Extract Ableton project inventory, samples, devices, and plugins.",
+        description="Extract Ableton project assets, samples, devices, and plugins.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
@@ -1380,6 +1724,7 @@ def run(args):
         ("input", display_path(als_path)),
         ("tracks", summary["track_count"]),
         ("clips", summary["clip_count"]),
+        ("assets", summary["unique_asset_count"]),
         ("samples", summary["unique_sample_count"]),
         ("devices", summary["device_count"]),
     ]

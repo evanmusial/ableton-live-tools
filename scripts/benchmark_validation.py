@@ -68,6 +68,15 @@ BENCHMARK_CASES = (
         ),
     },
     {
+        "name": "Project manifest full bundle",
+        "script": "extract_project_manifest.py",
+        "args": (
+            "{als}",
+            "--output-dir={tmp}/project_manifest",
+            "--json-format=compact",
+        ),
+    },
+    {
         "name": "Project audit bundle",
         "script": "audit_project.py",
         "compare_ref": False,
@@ -79,6 +88,10 @@ BENCHMARK_CASES = (
         ),
     },
 )
+
+REF_SCRIPT_DEPENDENCIES = {
+    "extract_project_manifest.py": ("extract_locators.py",),
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -160,6 +173,31 @@ def materialize_ref_scripts(git_ref: str, temp_dir: Path) -> dict[str, Path]:
 
         output_path.write_text(result.stdout, encoding="utf-8")
         scripts[script_name] = output_path
+
+    dependency_names = sorted(
+        {
+            dependency
+            for script_name in script_names
+            for dependency in REF_SCRIPT_DEPENDENCIES.get(script_name, ())
+        }
+    )
+
+    for dependency_name in dependency_names:
+        output_path = temp_dir / dependency_name
+        result = subprocess.run(
+            ["git", "show", f"{git_ref}:src/{dependency_name}"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"Unable to read src/{dependency_name} from {git_ref}:\n{result.stderr}"
+            )
+
+        output_path.write_text(result.stdout, encoding="utf-8")
 
     return scripts
 

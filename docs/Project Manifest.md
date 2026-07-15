@@ -6,7 +6,7 @@ The script uses only the Python 3 standard library.
 
 ## Current Version
 
-Version: `2026.06.15`
+Version: `2026.07.14`
 
 Author: Evan Musial <evan@evan.engineer>
 
@@ -15,6 +15,14 @@ License: Creative Commons Attribution-ShareAlike 4.0 International
 This license requires that reusers give credit to the creator. It allows reusers to distribute, remix, adapt, and build upon the material in any medium or format, even for commercial purposes. If others remix, adapt, or build upon the material, they must license the modified material under identical terms.
 
 ## Release Notes
+
+### 2026.07.14
+
+- Confirmed Project Manifest compatibility with Ableton Live 12.4.3 through the full CLI compatibility suite.
+- Added a unified asset inventory for samples, preset files, Max for Live devices, video/media files, source references, and other file-backed references.
+- Added `assets.tsv` and the JSON `assets` array with asset type, path, reference type, usage count, track/device context, resolved path, existence, and inside-project status.
+- Added asset summary counts to terminal, Markdown, and JSON output.
+- Added streamed Live 12 `MainTrack` and `PreHearTrack` asset discovery so their file references are included without retaining those large subtrees in memory.
 
 ### 2026.06.15
 
@@ -51,6 +59,7 @@ By default, the report directory contains:
 - `project_manifest.json`: the complete structured manifest.
 - `tracks.tsv`: one row per top-level track.
 - `clips.tsv`: one row per detected audio or MIDI clip.
+- `assets.tsv`: one row per unique file-backed project asset.
 - `samples.tsv`: one row per unique audio/sample reference.
 - `devices.tsv`: one row per native device, effect, Max for Live device, or third-party plugin.
 - `plugins_by_author.tsv`: the same device/plugin rows sorted by manufacturer/author.
@@ -99,6 +108,23 @@ python3 src/extract_project_manifest.py song.als --no-tsv
 - Track names and clip names that reference the sample.
 - Resolved local path candidate.
 - Whether the referenced file exists on disk from this checkout/session location.
+
+## Asset Manifest
+
+`assets.tsv` and the JSON `assets` array provide one unified view of file-backed project references, including samples, presets, Max for Live devices, video/media files, and other file references.
+
+Each asset includes:
+
+- Asset type.
+- Absolute and relative paths stored in the ALS.
+- Original file size and CRC metadata when available.
+- Reference count and underlying ALS reference types.
+- Tracks and devices that use the asset.
+- Best resolved local path candidate.
+- Whether the file exists locally.
+- Whether the resolved path is inside the ALS file's project folder.
+
+The existing sample manifest remains available because it includes sample-specific fields such as default sample rate, duration, and clip names.
 
 ## Plugin And Effects Manifest
 

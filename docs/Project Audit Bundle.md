@@ -6,7 +6,7 @@ The script uses only the Python 3 standard library and reuses the existing Proje
 
 ## Current Version
 
-Version: `2026.06.30`
+Version: `2026.07.14`
 
 Author: Evan Musial <evan@evan.engineer>
 
@@ -16,7 +16,15 @@ This license requires that reusers give credit to the creator. It allows reusers
 
 ## Release Notes
 
-### 2026.06.30
+### 2026.07.14
+
+- Confirmed the complete Project Audit workflow with Ableton Live 12.4.3 through the full CLI compatibility suite.
+- Added `assets.tsv` and the unified JSON asset inventory to the default bundle.
+- Added missing/external preset findings and Ableton creator/version metadata through the reused Project Health report.
+- Added streamed Live 12 Main/PreHear asset coverage so their file references appear in bundle outputs without retaining those large subtrees in memory.
+- Added the initial top-level Project Audit Markdown and JSON reports, reused manifest/health parsing, optional Semantic ALS Diff, failure thresholds, and `--no-tsv` support developed during the `2026.06.30` cycle.
+
+### 2026.06.30 Development Preview
 
 - Added the initial `src/audit_project.py` script.
 - Added a top-level Project Audit Markdown and JSON report.
@@ -40,7 +48,7 @@ It writes one output directory with:
 - `project_manifest.json`: the full Project Manifest payload.
 - `project_health.md`: the Project Health report.
 - `project_health.json`: the Project Health payload.
-- `tracks.tsv`, `clips.tsv`, `samples.tsv`, `devices.tsv`, `plugins_by_author.tsv`, and `plugins_by_name.tsv`: detailed manifest tables.
+- `assets.tsv`, `tracks.tsv`, `clips.tsv`, `samples.tsv`, `devices.tsv`, `plugins_by_author.tsv`, and `plugins_by_name.tsv`: detailed manifest tables.
 
 When `--before` is provided, it also writes:
 
@@ -131,7 +139,7 @@ The script prints a short status report after it runs:
 
 - The audited input path.
 - The output directory.
-- Project counts for tracks, clips, and unique samples.
+- Project counts for tracks, clips, unique assets, and unique samples.
 - Project-health finding counts.
 - Semantic diff status, or `not_run`.
 - Output file count.
