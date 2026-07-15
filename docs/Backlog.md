@@ -10,6 +10,12 @@ Each item keeps a plain status line instead of strike-through text:
 - `Proposed`: useful idea, not started yet.
 - `Exploring`: design or research has started, but the feature has not shipped.
 
+## Current Release
+
+Version `2026.07.14` is validated for Ableton Live 12.4.3. The release adds
+unified asset enumeration, preset-reference health checks, Live creator/version
+reporting, streamed Main/PreHear asset coverage, and the Project Audit Bundle.
+
 ## ✅ Delivered
 
 ### Extract Locators
@@ -52,6 +58,7 @@ Delivered versions:
 - `2026.05.17`: Canonical validation fixtures for `examples/validation/RYM_2026-03.als`.
 - `2026.05.31`: Standard-library `unittest` CLI validation suite and `scripts/benchmark_validation.py` benchmark runner with optional git-ref comparison.
 - `2026.06.15`: MIDI timing-map fixture and regression checks, DAW MIDI marker-map preset checks, Project Manifest semantic checks, Project Health Checker checks, Semantic ALS Diff no-change checks, plus expanded CLI argument-error coverage.
+- `2026.07.14`: Full compatibility smoke coverage for all six CLIs using the canonical project fixture with Ableton Live 12.4.3 creator metadata.
 
 ### Sample & Plugin/Effects Manifest
 
@@ -62,6 +69,7 @@ Create a bill of materials for the Live Set's audio references, native devices, 
 Delivered versions:
 
 - `2026.06.15`: Initial `src/extract_project_manifest.py` release with `samples.tsv`, `devices.tsv`, Markdown, JSON, sample usage counts, original file size/CRC fields, default sample rate/duration fields, resolved-path checks, missing-sample status, device/plugin locations, manufacturers, formats, enabled states, placeholder states, and preset names where detectable.
+- `2026.07.14`: Unified `assets.tsv` and JSON asset inventory for samples, presets, Max for Live devices, media, and other file references, including usage/context, resolution, existence, and inside-project status.
 
 ### Project Inventory
 
@@ -72,6 +80,7 @@ Produce a broad inventory of Ableton project contents.
 Delivered versions:
 
 - `2026.06.15`: Initial project inventory report with track counts, clip counts, freeze clip counts, sample counts, missing/existing sample counts, device counts, third-party plugin counts, Ableton native device counts, locator counts, tempo-event counts, time-signature-event counts, `tracks.tsv`, `clips.tsv`, `project_inventory.md`, and full `project_manifest.json`.
+- `2026.07.14`: Added unified asset counts and streamed Live 12 Main/PreHear asset discovery without retaining those large subtrees in memory.
 
 ### Plugin Manifest
 
@@ -92,6 +101,7 @@ Inspect an Ableton Live session and report anything that might make the project 
 Delivered versions:
 
 - `2026.06.15`: Initial `src/check_project_health.py` release with terminal, Markdown, and JSON reports; configurable `--fail-on=critical|warning|any|none`; critical findings for missing samples and placeholder plugins; warnings for outside-project sample references, mixed sample rates, disabled clips/devices, unknown plugin authors, unnamed tracks, and long sample paths; and info reporting for freeze clips.
+- `2026.07.14`: Added missing/external preset-reference warnings plus Ableton creator/version metadata in health output.
 
 Delivered checks:
 
@@ -103,6 +113,9 @@ Delivered checks:
 - Disabled clips or devices.
 - Freeze clips.
 - Very long file paths.
+- Missing preset-file references.
+- Preset-file references outside the project folder.
+- Ableton Live creator/version reporting.
 
 Delivered outputs:
 
@@ -113,10 +126,18 @@ Delivered outputs:
 Future expansion ideas:
 
 - Bit-depth checks when reliable bit-depth extraction is available.
-- External preset references.
 - Suspicious routing, sends, or track delay.
-- Ableton Live creator/version reporting in the health report.
 - Full frozen-track and freeze-file reference analysis.
+
+### Project Audit Bundle
+
+Status: ✅ `Delivered`
+
+Build a single handoff/audit command that writes a complete review folder for one Ableton Live Set, with optional semantic diff output when a baseline set is provided.
+
+Delivered versions:
+
+- `2026.07.14`: Added `project_audit.md`, `project_audit.json`, Project Manifest and Project Health outputs, optional Semantic ALS Diff output, health/diff failure thresholds, asset and manifest TSV tables, and single-manifest reuse for health and audit summaries.
 
 ### Semantic ALS Diff
 

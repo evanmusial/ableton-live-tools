@@ -1,3 +1,4 @@
+import gzip
 import json
 import os
 from pathlib import Path
@@ -14,6 +15,7 @@ TIMELINE_SCRIPT = REPO_ROOT / "src" / "extract_timeline.py"
 MANIFEST_SCRIPT = REPO_ROOT / "src" / "extract_project_manifest.py"
 HEALTH_SCRIPT = REPO_ROOT / "src" / "check_project_health.py"
 DIFF_SCRIPT = REPO_ROOT / "src" / "diff_als_semantic.py"
+AUDIT_SCRIPT = REPO_ROOT / "src" / "audit_project.py"
 
 
 class CliValidationTests(unittest.TestCase):
@@ -330,6 +332,7 @@ class CliValidationTests(unittest.TestCase):
                 "project_manifest.json",
                 "tracks.tsv",
                 "clips.tsv",
+                "assets.tsv",
                 "samples.tsv",
                 "devices.tsv",
                 "plugins_by_author.tsv",
@@ -350,6 +353,10 @@ class CliValidationTests(unittest.TestCase):
             self.assertEqual(summary["clip_count"], 742)
             self.assertEqual(summary["audio_clip_count"], 742)
             self.assertEqual(summary["unique_sample_count"], 162)
+            self.assertEqual(summary["asset_reference_count"], 932)
+            self.assertEqual(summary["unique_asset_count"], 181)
+            self.assertEqual(summary["sample_asset_count"], 162)
+            self.assertEqual(summary["preset_asset_count"], 19)
             self.assertEqual(summary["device_count"], 161)
             self.assertEqual(summary["third_party_plugin_count"], 55)
             self.assertEqual(summary["ableton_native_device_count"], 106)
@@ -364,6 +371,18 @@ class CliValidationTests(unittest.TestCase):
             self.assertIn("Filter EQ3", device_names)
             self.assertIn("iZotope", manufacturers)
             self.assertIn("Ableton", manufacturers)
+
+            asset_types = {asset["asset_type"] for asset in manifest["assets"]}
+            preset_paths = {
+                asset["path"]
+                for asset in manifest["assets"]
+                if asset["asset_type"] == "preset"
+            }
+            self.assertEqual(asset_types, {"sample", "preset"})
+            self.assertTrue(
+                any(path.endswith("Default.aupreset") for path in preset_paths)
+            )
+            self.assertTrue(any(path.endswith(".adg") for path in preset_paths))
 
             markdown = (output_dir / "project_inventory.md").read_text(
                 encoding="utf-8"
@@ -395,10 +414,14 @@ class CliValidationTests(unittest.TestCase):
             self.assertEqual(health["status"], "critical")
             self.assertEqual(health["summary"]["unique_sample_count"], 162)
             self.assertEqual(health["summary"]["missing_sample_count"], 162)
-            self.assertIn(
-                "missing_samples",
-                {finding["category"] for finding in health["findings"]},
+            self.assertEqual(
+                health["metadata"]["ableton"]["creator"],
+                "Ableton Live 12.3.6",
             )
+            categories = {finding["category"] for finding in health["findings"]}
+            self.assertIn("missing_samples", categories)
+            self.assertIn("missing_preset_references", categories)
+            self.assertIn("external_preset_references", categories)
 
             markdown = markdown_path.read_text(encoding="utf-8")
             self.assertIn("# Project Health", markdown)
@@ -432,6 +455,149 @@ class CliValidationTests(unittest.TestCase):
             for section in diff["sections"]:
                 self.assertEqual(section["added_count"], 0, section["name"])
                 self.assertEqual(section["removed_count"], 0, section["name"])
+
+    def test_project_audit_bundle_writes_reused_reports(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "project_audit"
+
+            self.run_cli(
+                AUDIT_SCRIPT,
+                ALS_PATH,
+                "--fail-on=none",
+                "--output-dir",
+                output_dir,
+                "--json-format=compact",
+            )
+
+            expected_files = (
+                "project_audit.md",
+                "project_audit.json",
+                "project_inventory.md",
+                "project_manifest.json",
+                "project_health.md",
+                "project_health.json",
+                "tracks.tsv",
+                "clips.tsv",
+                "assets.tsv",
+                "samples.tsv",
+                "devices.tsv",
+                "plugins_by_author.tsv",
+                "plugins_by_name.tsv",
+            )
+
+            for filename in expected_files:
+                self.assertTrue((output_dir / filename).exists(), filename)
+
+            audit = json.loads(
+                (output_dir / "project_audit.json").read_text(encoding="utf-8")
+            )
+            summary = audit["summary"]
+
+            self.assertEqual(audit["status"], "critical")
+            self.assertEqual(audit["exit_code"], 0)
+            self.assertEqual(summary["track_count"], 160)
+            self.assertEqual(summary["clip_count"], 742)
+            self.assertEqual(summary["unique_asset_count"], 181)
+            self.assertEqual(summary["unique_sample_count"], 162)
+            self.assertEqual(summary["device_count"], 161)
+            self.assertEqual(summary["locator_count"], 66)
+            self.assertEqual(audit["health"]["status"], "critical")
+            self.assertIsNone(audit["semantic_diff"])
+            self.assertTrue(
+                audit["metadata"]["performance"]["manifest_reused_for_health"]
+            )
+            self.assertFalse(
+                audit["metadata"]["performance"]["full_locator_exports_written"]
+            )
+            self.assertFalse(
+                audit["metadata"]["performance"]["full_timeline_exports_written"]
+            )
+
+    def test_project_audit_same_file_diff_has_no_changes(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "project_audit"
+
+            self.run_cli(
+                AUDIT_SCRIPT,
+                ALS_PATH,
+                "--before",
+                ALS_PATH,
+                "--fail-on=none",
+                "--output-dir",
+                output_dir,
+            )
+
+            self.assertTrue((output_dir / "semantic_diff.md").exists())
+            self.assertTrue((output_dir / "semantic_diff.json").exists())
+
+            audit = json.loads(
+                (output_dir / "project_audit.json").read_text(encoding="utf-8")
+            )
+            diff = json.loads(
+                (output_dir / "semantic_diff.json").read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(diff["status"], "same")
+            self.assertEqual(diff["change_count"], 0)
+            self.assertEqual(audit["semantic_diff"]["status"], "same")
+            self.assertEqual(audit["semantic_diff"]["change_count"], 0)
+
+    def test_ableton_live_12_4_3_compatibility_across_all_clis(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            als_path = temp_path / "RYM_2026-03_Ableton_12.4.3.als"
+            xml_payload = gzip.decompress(ALS_PATH.read_bytes())
+            old_creator = b'Creator="Ableton Live 12.3.6"'
+            new_creator = b'Creator="Ableton Live 12.4.3"'
+            self.assertIn(old_creator, xml_payload)
+            als_path.write_bytes(gzip.compress(xml_payload.replace(old_creator, new_creator, 1)))
+
+            locators_path = temp_path / "locators.tsv"
+            timeline_path = temp_path / "timeline.tsv"
+            manifest_dir = temp_path / "manifest"
+            health_path = temp_path / "health.json"
+            diff_path = temp_path / "diff.json"
+            audit_dir = temp_path / "audit"
+
+            self.run_cli(LOCATORS_SCRIPT, als_path, "--output", locators_path)
+            self.run_cli(TIMELINE_SCRIPT, als_path, "--output", timeline_path)
+            self.run_cli(MANIFEST_SCRIPT, als_path, "--output-dir", manifest_dir)
+            self.run_cli(
+                HEALTH_SCRIPT,
+                als_path,
+                "--fail-on=none",
+                "--json",
+                health_path,
+            )
+            self.run_cli(
+                DIFF_SCRIPT,
+                als_path,
+                als_path,
+                "--json",
+                diff_path,
+            )
+            self.run_cli(
+                AUDIT_SCRIPT,
+                als_path,
+                "--fail-on=none",
+                "--output-dir",
+                audit_dir,
+            )
+
+            manifest = json.loads(
+                (manifest_dir / "project_manifest.json").read_text(encoding="utf-8")
+            )
+            health = json.loads(health_path.read_text(encoding="utf-8"))
+            audit = json.loads(
+                (audit_dir / "project_audit.json").read_text(encoding="utf-8")
+            )
+
+            self.assertTrue(locators_path.exists())
+            self.assertTrue(timeline_path.exists())
+            self.assertEqual(manifest["metadata"]["ableton"]["creator"], "Ableton Live 12.4.3")
+            self.assertEqual(health["metadata"]["ableton"]["creator"], "Ableton Live 12.4.3")
+            self.assertEqual(audit["metadata"]["ableton"]["creator"], "Ableton Live 12.4.3")
+            self.assertEqual(json.loads(diff_path.read_text(encoding="utf-8"))["status"], "same")
 
     def test_missing_input_returns_error_exit_code(self):
         missing_file = REPO_ROOT / "examples" / "validation" / "missing.als"
@@ -468,6 +634,13 @@ class CliValidationTests(unittest.TestCase):
             ALS_PATH,
             check=False,
         )
+        audit_result = self.run_cli(
+            AUDIT_SCRIPT,
+            missing_file,
+            "--output-dir",
+            Path(tempfile.gettempdir()) / "missing-project-audit",
+            check=False,
+        )
 
         self.assertEqual(locator_result.returncode, 1)
         self.assertIn("status     error", locator_result.stderr)
@@ -479,6 +652,8 @@ class CliValidationTests(unittest.TestCase):
         self.assertIn("status     error", health_result.stderr)
         self.assertEqual(diff_result.returncode, 1)
         self.assertIn("status     error", diff_result.stderr)
+        self.assertEqual(audit_result.returncode, 1)
+        self.assertIn("status     error", audit_result.stderr)
 
     def test_cue_audio_without_cue_returns_argument_error(self):
         result = self.run_cli(

@@ -25,6 +25,9 @@ The first test layer focuses on stable user-visible behavior:
 - `extract_project_manifest.py` Markdown, JSON, and TSV output presence plus semantic inventory counts.
 - `check_project_health.py` Markdown and JSON report output plus expected missing-sample findings.
 - `diff_als_semantic.py` Markdown and JSON output for an identical-file no-change comparison.
+- `audit_project.py` bundled audit output, manifest/health reuse metadata, optional same-file semantic diff output, and expected fixture counts.
+- Unified asset enumeration, preset-reference health findings, and streamed Live 12 Main/PreHear asset coverage.
+- Ableton Live 12.4.3 compatibility across all six CLIs using the canonical project fixture with 12.4.3 creator metadata.
 - Missing input files returning error exit code `1`.
 - Command-line argument errors returning exit code `2`.
 

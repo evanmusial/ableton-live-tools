@@ -6,7 +6,7 @@ The script uses only the Python 3 standard library and reuses the streaming pars
 
 ## Current Version
 
-Version: `2026.06.15`
+Version: `2026.07.14`
 
 Author: Evan Musial <evan@evan.engineer>
 
@@ -15,6 +15,13 @@ License: Creative Commons Attribution-ShareAlike 4.0 International
 This license requires that reusers give credit to the creator. It allows reusers to distribute, remix, adapt, and build upon the material in any medium or format, even for commercial purposes. If others remix, adapt, or build upon the material, they must license the modified material under identical terms.
 
 ## Release Notes
+
+### 2026.07.14
+
+- Confirmed Project Health compatibility with Ableton Live 12.4.3 through the full CLI compatibility suite.
+- Added warnings for missing preset-file references and preset references outside the ALS project folder.
+- Added Ableton creator, major-version, and minor-version metadata to JSON and Markdown output, plus the creator string to terminal output.
+- Reused the unified Project Manifest asset inventory so preset checks do not add another ALS parsing pass.
 
 ### 2026.06.15
 
@@ -37,6 +44,8 @@ Current checks include:
 - Missing sample/audio references.
 - Placeholder plugins.
 - Sample references that appear to live outside the ALS file's folder.
+- Referenced preset files that are unavailable locally.
+- Preset references that appear to live outside the ALS file's folder.
 - Mixed default sample rates in referenced samples.
 - Disabled clips.
 - Disabled devices/plugins.
@@ -82,7 +91,7 @@ python3 src/check_project_health.py song.als --json=health.json --json-format=pr
 
 JSON output includes:
 
-- Metadata.
+- Metadata, including Ableton creator and version fields.
 - Overall status.
 - Exit code for the current failure threshold.
 - Project summary counts.
@@ -114,6 +123,7 @@ Threshold meanings:
 The script prints a short status report after it runs:
 
 - The input session path.
+- The Ableton creator/version string recorded by the Set.
 - Critical finding count.
 - Warning finding count.
 - Info finding count.
@@ -126,4 +136,4 @@ Reports are headed `Project Health Results`. Runtime errors exit with status cod
 
 The health checker intentionally depends on the Project Manifest parser. That keeps sample, clip, track, device, and plugin extraction centralized instead of creating a parallel parser with subtly different behavior.
 
-Future health checks should be added only after the underlying field is parsed deliberately. Good candidates include mixer/routing checks, sends, track delay, external preset references, and more complete plugin availability hints.
+Future health checks should be added only after the underlying field is parsed deliberately. Good candidates include mixer/routing checks, sends, track delay, and more complete plugin availability hints.
