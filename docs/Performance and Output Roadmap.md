@@ -2,6 +2,39 @@
 
 This document records performance findings and export-format candidates for future Ableton Live Tools releases. It is meant to keep profiling notes close to the code without treating unimplemented ideas as shipped behavior.
 
+## 2026.06.30 In Progress
+
+Version `2026.06.30` is the active development cycle on the `2026.06.30`
+branch. Performance notes, output-format candidates, and validation findings
+for this cycle should be recorded here as work is implemented. Nothing in this
+section should be treated as shipped behavior until the release is validated,
+merged, tagged, and published.
+
+In-progress work:
+
+- Added `src/audit_project.py` as a Project Audit Bundle command.
+- Reused the parsed Project Manifest object for health checks and top-level audit summaries, so the default audit bundle does not shell out to or rerun the individual manifest and health CLIs.
+- Kept full locator and full timeline row exports out of the default audit bundle; those remain dedicated commands for workflows that need every locator or timeline event row.
+- Added `Project audit bundle` to `scripts/benchmark_validation.py` as a current-only benchmark case, because older refs do not contain the new script.
+
+Performance validation was run on `examples/validation/RYM_2026-03.als` with Python 3.14.5. Each row uses the median of seven runs and the elapsed time reported by the CLI.
+
+| Tool / Export Shape | Baseline Median | Current Median | Change |
+| --- | ---: | ---: | ---: |
+| `extract_locators.py` metadata TSV + JSON | `0.711s` | `0.706s` | `0.7%` faster |
+| `extract_timeline.py` locator-only TSV | `0.721s` | `0.717s` | `0.6%` faster |
+| `extract_timeline.py` beat-grid core TSV | `0.794s` | `0.793s` | `0.1%` faster |
+| `extract_timeline.py` full TSV + JSON | `0.808s` | `0.820s` | `1.5%` slower |
+| `audit_project.py` full default bundle | n/a | `2.032s` | current only |
+
+The existing locator and timeline paths are effectively flat against `main`; the only measured slowdown was a `1.5%` movement in the full timeline case, and this cycle did not change that tool's implementation. The new audit bundle writes the manifest, health, top-level audit, and manifest TSV outputs in one command while reusing parsed manifest data for health and audit reporting.
+
+Validation:
+
+- `python3 -m py_compile src/extract_locators.py src/extract_timeline.py src/extract_project_manifest.py src/check_project_health.py src/diff_als_semantic.py src/audit_project.py tests/test_cli_validation.py scripts/benchmark_validation.py`
+- `python3 -m unittest discover -s tests`
+- `python3 scripts/benchmark_validation.py --runs=7 --compare-ref=main`
+
 ## 2026.05.29 Profiling Baseline
 
 Benchmarks were run on `examples/validation/RYM_2026-03.als` with Python 3.14.5.

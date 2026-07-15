@@ -10,6 +10,13 @@ Each item keeps a plain status line instead of strike-through text:
 - `Proposed`: useful idea, not started yet.
 - `Exploring`: design or research has started, but the feature has not shipped.
 
+## Current Development
+
+Version `2026.06.30` is in progress on the `2026.06.30` branch. Items added
+for this development cycle should stay under `Proposed` or `Exploring` until
+they are implemented, validated, documented, and ready to move into the
+delivered sections below.
+
 ## ✅ Delivered
 
 ### Extract Locators
@@ -152,4 +159,20 @@ Future expansion ideas:
 
 ## Proposed
 
-No proposed backlog items are currently pending. New ideas should be added here first, then moved into the delivered section with a version note when they ship.
+### Project Audit Bundle
+
+Status: `Exploring`
+
+Build a single handoff/audit command that writes a complete review folder for one Ableton Live Set, with optional semantic diff output when a baseline set is provided.
+
+Current `2026.06.30` scope:
+
+- Top-level `project_audit.md` and `project_audit.json` reports.
+- Project Manifest Markdown, JSON, and optional TSV tables.
+- Project Health Markdown and JSON reports.
+- Optional Semantic ALS Diff Markdown and JSON reports with `--before`.
+- Health-based failure thresholds through `--fail-on=critical|warning|any|none`.
+- Optional diff-based failure through `--fail-on-diff`.
+- Performance-preserving implementation that reuses the parsed Project Manifest object for health checks and top-level audit summaries instead of shelling out to individual CLIs.
+
+Move this item into the delivered section once the `2026.06.30` release branch is validated, merged, tagged, and published.

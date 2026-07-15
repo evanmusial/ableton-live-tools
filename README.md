@@ -6,13 +6,19 @@ tempo-aware timeline data, Mixcloud-compatible tracklists, Adobe Audition marker
 files, WebVTT chapters, CUE sheets, Markdown reports, MIDI locator markers and
 timing maps, Logic Pro/Pro Tools/Cubase/Nuendo marker-map presets, REAPER marker
 CSV files, project inventories, sample manifests, plugin/effects manifests,
-project health checks, semantic ALS diffs, JSON exports, and fixture-backed
-validation workflows.
+project health checks, semantic ALS diffs, JSON exports, fixture-backed
+validation workflows, and bundled project audits.
 
 The scripts are standard-library Python and are designed to be easy to run from
 a terminal, CI job, or batch-processing workflow. They are optimized for
 high-performance parsing, low memory use, and low-friction command-line use on
 large Ableton Live sets.
+
+## Current Development
+
+Version `2026.06.30` is in progress on the `2026.06.30` branch. The current
+stable release remains `2026.06.15` until the next release branch is validated,
+merged, tagged, and published.
 
 ## Points Of Interest
 
@@ -30,6 +36,8 @@ large Ableton Live sets.
 - Check project health for missing samples, placeholder plugins, disabled
   material, outside-project sample references, mixed sample rates, and other
   archive/collaboration risks.
+- Build one project-audit folder with handoff status, manifest output, health
+  reports, optional semantic diff output, and detailed manifest tables.
 - Compare two `.als` files semantically so reviews can focus on meaningful
   changes to locators, timing maps, tracks, clips, samples, and devices/plugins.
 - Include metadata such as BPM, bar/beat position, time signature, absolute
@@ -45,6 +53,8 @@ large Ableton Live sets.
 - [Extract Timeline](<docs/Extract Timeline.md>): `src/extract_timeline.py` extracts a precise Ableton Live arrangement timeline from `.als` session files. It writes an interleaved event stream for tempo, tempo ramps, time signatures, detected keys, locators, clip boundaries, song end, and optional generated bar/beat grid rows, with real wall-clock time and sample indexes when a sample rate is available.
 
 - [Project Health Checker](<docs/Project Health Checker.md>): `src/check_project_health.py` checks an Ableton Live project for archive and collaboration risks, including missing samples, placeholder plugins, outside-project sample references, mixed sample rates, disabled clips/devices, frozen clips, unknown plugin authors, unnamed tracks, and unusually long sample paths. It writes terminal, Markdown, and JSON reports with configurable CI failure thresholds.
+
+- [Project Audit Bundle](<docs/Project Audit Bundle.md>): `src/audit_project.py` builds a bundled project handoff folder with a top-level audit, Project Manifest outputs, Project Health outputs, manifest TSV tables, and optional Semantic ALS Diff outputs. It reuses the parsed project manifest for health and audit summaries so the default bundle avoids extra full-output passes.
 
 - [Project Manifest](<docs/Project Manifest.md>): `src/extract_project_manifest.py` extracts project-level inventory data from `.als` session files. It writes Markdown, JSON, and TSV reports for tracks, clips, samples, native devices, third-party plugins, plugin/effect views sorted by author and name, and missing-sample checks.
 

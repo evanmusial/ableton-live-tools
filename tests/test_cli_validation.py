@@ -14,6 +14,7 @@ TIMELINE_SCRIPT = REPO_ROOT / "src" / "extract_timeline.py"
 MANIFEST_SCRIPT = REPO_ROOT / "src" / "extract_project_manifest.py"
 HEALTH_SCRIPT = REPO_ROOT / "src" / "check_project_health.py"
 DIFF_SCRIPT = REPO_ROOT / "src" / "diff_als_semantic.py"
+AUDIT_SCRIPT = REPO_ROOT / "src" / "audit_project.py"
 
 
 class CliValidationTests(unittest.TestCase):
@@ -433,6 +434,90 @@ class CliValidationTests(unittest.TestCase):
                 self.assertEqual(section["added_count"], 0, section["name"])
                 self.assertEqual(section["removed_count"], 0, section["name"])
 
+    def test_project_audit_bundle_writes_reused_reports(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "project_audit"
+
+            self.run_cli(
+                AUDIT_SCRIPT,
+                ALS_PATH,
+                "--fail-on=none",
+                "--output-dir",
+                output_dir,
+                "--json-format=compact",
+            )
+
+            expected_files = (
+                "project_audit.md",
+                "project_audit.json",
+                "project_inventory.md",
+                "project_manifest.json",
+                "project_health.md",
+                "project_health.json",
+                "tracks.tsv",
+                "clips.tsv",
+                "samples.tsv",
+                "devices.tsv",
+                "plugins_by_author.tsv",
+                "plugins_by_name.tsv",
+            )
+
+            for filename in expected_files:
+                self.assertTrue((output_dir / filename).exists(), filename)
+
+            audit = json.loads(
+                (output_dir / "project_audit.json").read_text(encoding="utf-8")
+            )
+            summary = audit["summary"]
+
+            self.assertEqual(audit["status"], "critical")
+            self.assertEqual(audit["exit_code"], 0)
+            self.assertEqual(summary["track_count"], 160)
+            self.assertEqual(summary["clip_count"], 742)
+            self.assertEqual(summary["unique_sample_count"], 162)
+            self.assertEqual(summary["device_count"], 161)
+            self.assertEqual(summary["locator_count"], 66)
+            self.assertEqual(audit["health"]["status"], "critical")
+            self.assertIsNone(audit["semantic_diff"])
+            self.assertTrue(
+                audit["metadata"]["performance"]["manifest_reused_for_health"]
+            )
+            self.assertFalse(
+                audit["metadata"]["performance"]["full_locator_exports_written"]
+            )
+            self.assertFalse(
+                audit["metadata"]["performance"]["full_timeline_exports_written"]
+            )
+
+    def test_project_audit_same_file_diff_has_no_changes(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "project_audit"
+
+            self.run_cli(
+                AUDIT_SCRIPT,
+                ALS_PATH,
+                "--before",
+                ALS_PATH,
+                "--fail-on=none",
+                "--output-dir",
+                output_dir,
+            )
+
+            self.assertTrue((output_dir / "semantic_diff.md").exists())
+            self.assertTrue((output_dir / "semantic_diff.json").exists())
+
+            audit = json.loads(
+                (output_dir / "project_audit.json").read_text(encoding="utf-8")
+            )
+            diff = json.loads(
+                (output_dir / "semantic_diff.json").read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(diff["status"], "same")
+            self.assertEqual(diff["change_count"], 0)
+            self.assertEqual(audit["semantic_diff"]["status"], "same")
+            self.assertEqual(audit["semantic_diff"]["change_count"], 0)
+
     def test_missing_input_returns_error_exit_code(self):
         missing_file = REPO_ROOT / "examples" / "validation" / "missing.als"
 
@@ -468,6 +553,13 @@ class CliValidationTests(unittest.TestCase):
             ALS_PATH,
             check=False,
         )
+        audit_result = self.run_cli(
+            AUDIT_SCRIPT,
+            missing_file,
+            "--output-dir",
+            Path(tempfile.gettempdir()) / "missing-project-audit",
+            check=False,
+        )
 
         self.assertEqual(locator_result.returncode, 1)
         self.assertIn("status     error", locator_result.stderr)
@@ -479,6 +571,8 @@ class CliValidationTests(unittest.TestCase):
         self.assertIn("status     error", health_result.stderr)
         self.assertEqual(diff_result.returncode, 1)
         self.assertIn("status     error", diff_result.stderr)
+        self.assertEqual(audit_result.returncode, 1)
+        self.assertIn("status     error", audit_result.stderr)
 
     def test_cue_audio_without_cue_returns_argument_error(self):
         result = self.run_cli(

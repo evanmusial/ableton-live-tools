@@ -67,6 +67,17 @@ BENCHMARK_CASES = (
             "--json={tmp}/timeline.json",
         ),
     },
+    {
+        "name": "Project audit bundle",
+        "script": "audit_project.py",
+        "compare_ref": False,
+        "args": (
+            "{als}",
+            "--fail-on=none",
+            "--output-dir={tmp}/project_audit",
+            "--json-format=compact",
+        ),
+    },
 )
 
 
@@ -124,7 +135,15 @@ def run_command(command: list[str]) -> float:
 def materialize_ref_scripts(git_ref: str, temp_dir: Path) -> dict[str, Path]:
     scripts = {}
 
-    for script_name in ("extract_locators.py", "extract_timeline.py"):
+    script_names = sorted(
+        {
+            case["script"]
+            for case in BENCHMARK_CASES
+            if case.get("compare_ref", True)
+        }
+    )
+
+    for script_name in script_names:
         output_path = temp_dir / f"{git_ref.replace('/', '_')}_{script_name}"
         result = subprocess.run(
             ["git", "show", f"{git_ref}:src/{script_name}"],
@@ -147,8 +166,8 @@ def materialize_ref_scripts(git_ref: str, temp_dir: Path) -> dict[str, Path]:
 
 def working_tree_scripts() -> dict[str, Path]:
     return {
-        "extract_locators.py": REPO_ROOT / "src" / "extract_locators.py",
-        "extract_timeline.py": REPO_ROOT / "src" / "extract_timeline.py",
+        case["script"]: REPO_ROOT / "src" / case["script"]
+        for case in BENCHMARK_CASES
     }
 
 
@@ -175,6 +194,9 @@ def run_suite(
     results = {}
 
     for case in BENCHMARK_CASES:
+        if case["script"] not in scripts:
+            continue
+
         elapsed_values = []
 
         for run_index in range(runs):
@@ -208,12 +230,15 @@ def print_summary(current_results, baseline_results=None) -> None:
 
         for case in BENCHMARK_CASES:
             name = case["name"]
-            baseline = statistics.median(baseline_results[name])
             current = statistics.median(current_results[name])
-            print(
-                f"| {name} | `{baseline:.3f}s` | `{current:.3f}s` | "
-                f"`{change_percent(baseline, current)}` |"
-            )
+            if name in baseline_results:
+                baseline = statistics.median(baseline_results[name])
+                print(
+                    f"| {name} | `{baseline:.3f}s` | `{current:.3f}s` | "
+                    f"`{change_percent(baseline, current)}` |"
+                )
+            else:
+                print(f"| {name} | n/a | `{current:.3f}s` | `current only` |")
     else:
         print("| Case | Median |")
         print("| --- | ---: |")
@@ -229,6 +254,8 @@ def print_runs(label: str, results: dict[str, list[float]]) -> None:
 
     for case in BENCHMARK_CASES:
         name = case["name"]
+        if name not in results:
+            continue
         values = ", ".join(f"{value:.3f}s" for value in results[name])
         print(f"- {name}: {values}")
 
