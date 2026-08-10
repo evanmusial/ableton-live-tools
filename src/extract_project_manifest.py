@@ -1,101 +1,16 @@
 #!/usr/bin/env python3
 
 """
-extract_project_manifest.py
-Version: 2026.07.14
+Extract a structured project inventory from an Ableton session.
+
+The parser retains one complete top-level track subtree at a time, preserving
+enough parent context for clips, racks, devices, samples, and other file-backed
+assets without building the full uncompressed XML tree in memory.
+
+See ``docs/Project Manifest.md`` for CLI and output documentation.
 
 Author: Evan Musial <evan@evan.engineer>
 License: Creative Commons Attribution-ShareAlike 4.0 International
-
-License meaning:
-  - This license requires that reusers give credit to the creator.
-  - It allows reusers to distribute, remix, adapt, and build upon the material
-    in any medium or format, even for commercial purposes.
-  - If others remix, adapt, or build upon the material, they must license the
-    modified material under identical terms.
-
-Version 2026.07.14 notes:
-  - Confirms compatibility with Ableton Live 12.4.3 through the full CLI
-    compatibility suite.
-  - Adds a unified file-backed asset inventory for samples, preset files, Max for
-    Live devices, video/media files, source references, and other file-backed
-    project references.
-  - Adds assets.tsv plus a structured assets array and asset counts in the JSON
-    manifest and Markdown inventory.
-  - Records asset reference types, usage counts, tracks, devices, local path
-    resolution, existence, and whether each asset is inside the project folder.
-
-Version 2026.06.15 notes:
-  - Initial Project Manifest release.
-  - Adds project inventory reporting for tracks, clips, samples, devices, and
-    high-level Ableton metadata.
-  - Adds sample manifest TSV/JSON data with audio file paths, relative paths,
-    original file sizes, original CRC values, default sample rates, default
-    durations, usage counts, and missing-file status.
-  - Adds plugin/effects manifest data for third-party plugins and Ableton native
-    devices, including track location, device position, manufacturer, format,
-    enabled state, placeholder state, and preset names where detectable.
-  - Adds plugin views sorted by author/manufacturer and by plugin/effect name.
-  - Writes a Markdown report, JSON payload, and TSV tables in one output
-    directory.
-  - Tested and validated with Ableton Live 12.4.2 sessions.
-
-What this script does:
-  Ableton Live .als files are XML documents, usually gzip-compressed. This tool
-  streams each top-level track XML subtree, extracts inventory data from that
-  subtree, then clears it before moving to the next track. That keeps memory use
-  much lower than building the full uncompressed ALS tree while still allowing
-  precise track-local parsing of clips, sample references, and devices.
-
-Default output:
-  If --output-dir is omitted, the script writes a directory named
-  <input filename>.project-manifest in the current working directory.
-
-  Files written by default:
-    project_inventory.md
-    project_manifest.json
-    tracks.tsv
-    clips.tsv
-    assets.tsv
-    samples.tsv
-    devices.tsv
-    plugins_by_author.tsv
-    plugins_by_name.tsv
-
-Arguments:
-  als_path
-      Path to the Ableton .als file.
-
-      Example:
-        python3 src/extract_project_manifest.py path/to/song.als
-
-  --output-dir=PATH
-  -o PATH
-      Directory where the report files should be written.
-
-      Example:
-        python3 src/extract_project_manifest.py song.als --output-dir=song_manifest
-
-  --json-format=pretty|compact
-      Choose whether JSON is human-readable or compact.
-      Default: pretty
-
-  --no-json
-      Do not write project_manifest.json.
-
-  --no-markdown
-      Do not write project_inventory.md.
-
-  --no-tsv
-      Do not write TSV tables.
-
-CLI reporting:
-  - Reports are headed "Project Manifest Results".
-  - Every written file is listed with the label "output".
-  - Elapsed processing time is shown with three decimal places.
-  - Successful runs exit with status code 0.
-  - Runtime/user-data errors exit with status code 1.
-  - Command-line argument errors exit with status code 2.
 """
 
 import argparse
@@ -175,6 +90,7 @@ class ProjectManifestError(Exception):
     """User-facing runtime error with structured report details."""
 
     def __init__(self, problem, details=None):
+        """Store the summary and structured detail rows for CLI reporting."""
         super().__init__(problem)
         self.problem = problem
         self.details = details or []
@@ -184,6 +100,7 @@ class ManifestArgumentParser(argparse.ArgumentParser):
     """Argparse subclass that reports argument errors like the other tools."""
 
     def error(self, message):
+        """Report a usage error in the standard CLI format and exit with 2."""
         print_report(
             "error",
             [("problem", message)],
@@ -702,7 +619,13 @@ def device_record_from_element(device, track, device_index, parent_map):
 
 
 def parse_track_element(track_element, track_index, als_path):
-    """Extract tracks, clips, samples, and devices from one top-level track."""
+    """
+    Extract inventory records from one complete top-level track subtree.
+
+    The parent map preserves rack and freeze-context relationships that are not
+    available from an element alone. Sample and asset occurrences are returned
+    as updates so the caller can merge them into project-wide deduplicated maps.
+    """
     track = TrackRecord(
         track_index=track_index,
         track_id=track_element.attrib.get("Id", ""),
@@ -885,7 +808,14 @@ def parse_locator_timing_counts(als_path):
 
 
 def parse_project_manifest(als_path):
-    """Parse a project manifest from an Ableton Live session file."""
+    """
+    Stream an Ableton session into a project manifest.
+
+    Only one complete top-level track subtree is retained at a time, which keeps
+    memory bounded while still supporting parent-aware clip, device, and rack
+    inspection. File references outside normal tracks are collected as they
+    close so Main and PreHear assets are not lost.
+    """
     locator_count, tempo_count, time_signature_count = parse_locator_timing_counts(
         als_path
     )
@@ -938,6 +868,9 @@ def parse_project_manifest(als_path):
                         and len(path) == active_track_depth
                         and element.tag in TRACK_TAGS
                     ):
+                        # Children remain intact until the top-level track closes;
+                        # parse_track_element needs the complete subtree and then
+                        # element.clear releases it before the next track arrives.
                         parent_tag = path[-2]
                         is_top_level_track = parent_tag in (
                             "Tracks",
@@ -970,6 +903,8 @@ def parse_project_manifest(als_path):
                         continue
 
                     if element.tag == "FileRef" and active_track_depth is None:
+                        # MainTrack and PreHearTrack assets sit outside the normal
+                        # track collections, so capture their FileRefs directly.
                         reference_type = path[-2] if len(path) >= 2 else "FileRef"
                         track_name = ""
                         if "MainTrack" in path:
@@ -991,6 +926,8 @@ def parse_project_manifest(als_path):
                     )
                     path.pop()
 
+                    # FileRef children must survive until the FileRef close event;
+                    # clearing Path or RelativePath earlier would erase its value.
                     if active_track_depth is None and not preserve_for_file_ref:
                         element.clear()
     except FileNotFoundError as exc:

@@ -95,6 +95,7 @@ REF_SCRIPT_DEPENDENCIES = {
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse benchmark controls and reject non-positive run counts."""
     parser = argparse.ArgumentParser(
         description="Benchmark the Ableton Live Tools validation fixture.",
     )
@@ -123,6 +124,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def run_command(command: list[str]) -> float:
+    """Run one CLI benchmark and return its self-reported elapsed seconds."""
     result = subprocess.run(
         command,
         cwd=REPO_ROOT,
@@ -146,6 +148,12 @@ def run_command(command: list[str]) -> float:
 
 
 def materialize_ref_scripts(git_ref: str, temp_dir: Path) -> dict[str, Path]:
+    """
+    Materialize benchmarked scripts and import dependencies from a Git ref.
+
+    Reference scripts run from a temporary directory. Dependencies keep their
+    original filenames there so imports behave exactly as they do in ``src``.
+    """
     scripts = {}
 
     script_names = sorted(
@@ -203,6 +211,7 @@ def materialize_ref_scripts(git_ref: str, temp_dir: Path) -> dict[str, Path]:
 
 
 def working_tree_scripts() -> dict[str, Path]:
+    """Return benchmark script paths from the current working tree."""
     return {
         case["script"]: REPO_ROOT / "src" / case["script"]
         for case in BENCHMARK_CASES
@@ -215,6 +224,7 @@ def build_command(
     case_args: tuple[str, ...],
     output_dir: Path,
 ) -> list[str]:
+    """Build one isolated CLI command from a benchmark case template."""
     formatted_args = [
         arg.format(als=VALIDATION_ALS, tmp=output_dir)
         for arg in case_args
@@ -229,6 +239,7 @@ def run_suite(
     temp_root: Path,
     label: str,
 ) -> dict[str, list[float]]:
+    """Run every applicable benchmark case and retain each elapsed sample."""
     results = {}
 
     for case in BENCHMARK_CASES:
@@ -254,6 +265,7 @@ def run_suite(
 
 
 def change_percent(baseline: float, current: float) -> str:
+    """Describe a lower current runtime as faster and a higher one as slower."""
     if baseline <= 0:
         return ""
 
@@ -262,6 +274,7 @@ def change_percent(baseline: float, current: float) -> str:
 
 
 def print_summary(current_results, baseline_results=None) -> None:
+    """Print median runtimes as a Markdown table, with comparison when present."""
     if baseline_results:
         print("| Case | Baseline Median | Current Median | Change |")
         print("| --- | ---: | ---: | ---: |")
@@ -288,6 +301,7 @@ def print_summary(current_results, baseline_results=None) -> None:
 
 
 def print_runs(label: str, results: dict[str, list[float]]) -> None:
+    """Print individual samples for variance and outlier inspection."""
     print(f"\n{label} runs:")
 
     for case in BENCHMARK_CASES:
@@ -299,6 +313,7 @@ def print_runs(label: str, results: dict[str, list[float]]) -> None:
 
 
 def main() -> int:
+    """Run the requested benchmark suites and print their summaries."""
     args = parse_args()
     python_executable = sys.executable or "python3"
 

@@ -1,81 +1,16 @@
 #!/usr/bin/env python3
 
 """
-check_project_health.py
-Version: 2026.07.14
+Report Ableton project conditions that affect availability and portability.
+
+The checker reuses the streaming project manifest and produces findings for
+archive, transfer, collaboration, and CI review. Findings concern operational
+health, not the creative quality of the session.
+
+See ``docs/Project Health Checker.md`` for CLI and finding documentation.
 
 Author: Evan Musial <evan@evan.engineer>
 License: Creative Commons Attribution-ShareAlike 4.0 International
-
-License meaning:
-  - This license requires that reusers give credit to the creator.
-  - It allows reusers to distribute, remix, adapt, and build upon the material
-    in any medium or format, even for commercial purposes.
-  - If others remix, adapt, or build upon the material, they must license the
-    modified material under identical terms.
-
-Version 2026.07.14 notes:
-  - Confirms compatibility with Ableton Live 12.4.3 through the full CLI
-    compatibility suite.
-  - Reports missing and outside-project preset file references from the unified
-    asset inventory without treating serialized plugin state as unavailable.
-  - Adds Ableton Live creator and version metadata to JSON, Markdown, and
-    terminal health output.
-
-Version 2026.06.15 notes:
-  - Initial Project Health Checker release.
-  - Reuses the streaming project manifest parser so health checks can run on
-    large Ableton Live sets without loading the full uncompressed ALS XML tree.
-  - Reports critical missing-sample and placeholder-plugin findings.
-  - Reports warning/info findings for outside-project sample references, mixed
-    sample rates, disabled clips/devices, frozen clips, unknown plugin authors,
-    unnamed tracks, and unusually long sample paths.
-  - Adds Markdown and JSON output for archival, collaboration, and CI workflows.
-  - Tested and validated with Ableton Live 12.4.2 sessions.
-
-What this script does:
-  Project Health Checker reads an Ableton Live .als file and reports conditions
-  that can make a project harder to open, archive, transfer, render, or hand to
-  someone else. It is not a creative-quality checker and it does not decide
-  whether a musical choice is good or bad. It simply highlights project-health
-  risks that are commonly worth reviewing before a session leaves your machine.
-
-Default behavior:
-  - Prints a compact terminal report headed "Project Health Results".
-  - Exits 0 when no critical findings are present.
-  - Exits 1 when critical findings are present.
-  - Exits 2 for command-line argument errors.
-
-Arguments:
-  als_path
-      Path to the Ableton .als file.
-
-      Example:
-        python3 src/check_project_health.py song.als
-
-  --markdown=PATH
-      Write a human-readable Markdown health report.
-
-      Example:
-        python3 src/check_project_health.py song.als --markdown=health.md
-
-  --json=PATH
-      Write a JSON health report for automation and CI systems.
-
-      Example:
-        python3 src/check_project_health.py song.als --json=health.json
-
-  --json-format=pretty|compact
-      Choose whether JSON is human-readable or compact.
-      Default: pretty
-
-  --fail-on=critical|warning|any|none
-      Choose which finding severities should return exit code 1.
-      Default: critical
-
-      Examples:
-        python3 src/check_project_health.py song.als --fail-on=warning
-        python3 src/check_project_health.py song.als --fail-on=none --json=health.json
 """
 
 import argparse
@@ -129,6 +64,7 @@ class HealthArgumentParser(argparse.ArgumentParser):
     """Argparse subclass that reports argument errors in the tool's style."""
 
     def error(self, message):
+        """Report a usage error in the standard CLI format and exit with 2."""
         print_report(
             "error",
             [("problem", message)],
@@ -289,7 +225,14 @@ def finding_to_dict(finding):
 
 
 def build_health_findings(manifest, als_path):
-    """Inspect a parsed manifest and return ordered health findings."""
+    """
+    Inspect a parsed manifest and return findings in display order.
+
+    Finding order is part of the human-readable report: blocking availability
+    problems come first, portability and project-hygiene warnings follow, and
+    informational context comes last. New checks should be inserted according
+    to that priority instead of sorted alphabetically after collection.
+    """
     findings = []
     samples = sample_records(manifest)
     assets = asset_records(manifest)

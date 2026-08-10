@@ -34,6 +34,11 @@ The first test layer focuses on stable user-visible behavior:
 The locator JSON test normalizes `version` and `source_file`, because those
 fields intentionally change across releases and local checkout paths.
 
+`test_documentation_quality.py` also checks that every production and
+maintenance-script module, class, and function has a concise docstring with a
+complete summary sentence. Individual end-to-end tests rely on descriptive test
+names unless a fixture or normalization needs additional explanation.
+
 As the tools grow, a healthy test set will probably have two layers:
 
 - End-to-end CLI tests like these, which protect real user workflows.

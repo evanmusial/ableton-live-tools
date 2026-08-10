@@ -1,453 +1,17 @@
 #!/usr/bin/env python3
 
 """
-extract_locators.py
-Version: 2026.06.15
+Export Ableton arrangement locators to practical interchange formats.
+
+The parser streams gzip-compressed or plain ALS XML and preserves tempo points,
+linear tempo ramps, time signatures, pre-roll positions, and user offsets. The
+same normalized locator records feed text, table, chapter, cue, and MIDI outputs
+so timing behavior remains consistent across formats.
+
+See ``docs/Extract Locators.md`` for CLI and format documentation.
 
 Author: Evan Musial <evan@evan.engineer>
 License: Creative Commons Attribution-ShareAlike 4.0 International
-
-License meaning:
-  - This license requires that reusers give credit to the creator.
-  - It allows reusers to distribute, remix, adapt, and build upon the material
-    in any medium or format, even for commercial purposes.
-  - If others remix, adapt, or build upon the material, they must license the
-    modified material under identical terms.
-
-Version 2026.06.15 notes:
-  - Added optional MIDI timing-map output with --midi-timing-map.
-  - When enabled, the Standard MIDI export includes tempo and time-signature
-    meta events alongside locator marker meta events.
-  - Kept the default --midi behavior as a marker-only file for compatibility.
-  - Reuses the already parsed tempo and time-signature maps for MIDI timing
-    output instead of reading the ALS file a second time.
-  - Precomputes time-signature section positions and uses a compact timing
-    context object for a small locator-export performance improvement.
-  - Raises the streaming XML read chunk size from 1 MiB to 4 MiB to reduce
-    parser I/O overhead while keeping memory use low.
-  - Added a validation fixture and CLI regression test for MIDI timing-map
-    output.
-  - Added REAPER marker CSV export with --reaper.
-  - Added DAW-named MIDI marker-map presets for Logic Pro, Pro Tools, Cubase,
-    and Nuendo. These write Standard MIDI files with locator markers plus tempo
-    and time-signature meta events by default.
-  - Tested and validated with Ableton Live 12.4.2 sessions.
-
-Version 2026.06.02 notes:
-  - Added Adobe Audition marker export with --audition / -a.
-  - Added standard comma-separated CSV export with --csv.
-  - Added WebVTT chapter export with --webvtt.
-  - Added CUE sheet export with --cue and optional --cue-audio.
-  - Added Markdown locator report export with --markdown.
-  - Added Standard MIDI locator marker export with --midi.
-  - Writes Audition marker import files with Name, Start, Duration,
-    Time Format, Type, and Description columns.
-  - Uses tab-separated marker rows, matching Audition's practical marker
-    import/export format even when the file is saved with a .csv extension.
-  - Exports Ableton locators as zero-duration Audition Cue markers.
-  - Added validation fixtures for CSV, WebVTT, CUE, Markdown, MIDI, and
-    Audition marker output.
-
-Version 2026.05.31 notes:
-  - Added tag-name fast paths to the XML start and end handlers so unrelated
-    Ableton tags skip deeper parser-state checks.
-  - Replaced fixed tuple-slice path checks with direct parent/depth checks.
-  - Added standard-library unittest CLI validation under tests/.
-  - Added scripts/benchmark_validation.py for repeatable validation benchmarks.
-  - On the RYM_2026-03.als metadata TSV + JSON benchmark, median elapsed time
-    improved from 0.844s to 0.691s, about 18.1% faster.
-  - Confirmed fixture-compatible high-resolution TSV/Mixcloud and metadata
-    TSV/JSON output.
-
-Version 2026.05.29 notes:
-  - Added docs/Performance and Output Roadmap.md with profiling baselines,
-    optimization candidates, output-format candidates, and validation notes.
-  - Re-ran the usual validation checks against examples/validation/RYM_2026-03.als
-    on Python 3.14.5.
-  - Confirmed high-resolution TSV/Mixcloud and metadata TSV/JSON outputs still
-    match the validation fixtures exactly.
-  - Confirmed CLI success and missing-file error paths return script-friendly
-    exit codes.
-  - Tested with Ableton Live 12.4.1, released May 28, 2026.
-
-Version 2026.05.17 notes:
-  - Added optional TSV/JSON columns for tempo, song position, time signature,
-    absolute seconds, normalized seconds, absolute beats, bar number, time
-    signature section start, locator ID, and track number.
-  - Added JSON export with compact and human-readable formatting options.
-  - Added metadata validation exemplars under examples/validation.
-  - Updated CLI reporting with the "Locator Extraction Results" title,
-    repeated "output" rows for written files, three-decimal elapsed time, and
-    predictable exit codes for success and error handling.
-  - Tested and validated from Python 3.9 through Python 3.14.5.
-  - Tested with Ableton Live 12.4 (2026-04-24_d85a94ab5e) on macOS.
-  - Tested operating-system and CPU combinations:
-      - macOS Tahoe 26.5 (Apple Silicon: M3 Max)
-      - macOS Sequoia 15.7.7 (Intel Core i9-9980HK)
-      - Ubuntu 22.04.5 LTS (Intel Xeon E5-1620)
-      - Ubuntu 24.04 LTS (Dual Intel Xeon E5-2680 v3)
-  - Added a future export-field checklist in docs/locator-export-roadmap.md.
-
-Version 2026.05.16 notes:
-  - Optimized ALS parsing to run about 26% faster on the RYM_2026-03.als test session.
-  - Reduced peak memory use by about 96% on the RYM_2026-03.als test session.
-  - Moved the script into src/ and moved the long-form guide into Extract Locators.md.
-  - Tested and validated from Python 3.9 through Python 3.14.5.
-  - Tested with Ableton Live 12.4 (2026-04-24_d85a94ab5e) on macOS.
-  - Tested operating-system and CPU combinations:
-      - macOS Tahoe 26.5 (Apple Silicon: M3 Max)
-      - macOS Sequoia 15.7.7 (Intel Core i9-9980HK)
-      - Ubuntu 22.04.5 LTS (Intel Xeon E5-1620)
-      - Ubuntu 24.04 LTS (Dual Intel Xeon E5-2680 v3)
-
-Version 2026.05 notes:
-  - Support for pre-roll offset (data extending before 1.1.1 or if 1.1.1 has been moved)
-  - Support for tempo changes and ramps: the locator's time will be calculated correctly.
-
-Extract Ableton Live locator markers from an .als file and write them to a TSV.
-
-Timing note:
-  - Locator times are calculated against Ableton tempo changes and linear tempo
-    ramps, so exported timestamps follow the actual session timeline.
-  - User offsets are applied after locator normalization, which keeps offset
-    behavior predictable even when a set begins somewhere after bar 1.
-
-Features:
-  - Handles both plain XML .als files and gzip-compressed .als files.
-  - Reads tempo automation, including linear tempo ramps.
-  - Normalizes locator times so the earliest locator starts at 00:00 by default.
-  - Can add a positive or negative time offset to every locator.
-  - Can output timestamps with configurable decimal precision.
-  - Can strip leading musical keys from locator names.
-  - Can write a Mixcloud-compatible timestamped tracklist.
-  - Can write a standard comma-separated CSV file for spreadsheet workflows.
-  - Can write an Adobe Audition marker import file.
-  - Can write WebVTT chapter cues.
-  - Can write CUE sheets for locator-based track indexes.
-  - Can write Markdown locator reports.
-  - Can write REAPER marker CSV files.
-  - Can write Standard MIDI files with locator marker meta events.
-  - Can optionally add tempo and time-signature MIDI meta events to Standard
-    MIDI exports.
-  - Can write Logic Pro, Pro Tools, Cubase, and Nuendo MIDI marker-map presets.
-  - Can write compact or human-readable JSON.
-  - Can customize or omit the TSV heading row.
-  - Can add optional locator-position metadata columns.
-  - Reports success and error status with stable CLI exit codes.
-  - Writes tab-separated output with default columns:
-      Time    Locator Name
-
-Arguments:
-  als_path
-      Path to the Ableton .als file.
-
-      Example:
-        python3 src/extract_locators.py path/to/song.als
-
-  --add-offset=SECONDS
-      Add SECONDS to every locator after normalization.
-      Fractional and negative values are accepted.
-
-      Examples:
-        python3 src/extract_locators.py song.als --add-offset=27
-        python3 src/extract_locators.py song.als --add-offset=27.5
-        python3 src/extract_locators.py song.als --add-offset=-3.25
-
-  --precision=DECIMALS
-      Number of decimal places to show in the seconds portion of each timestamp.
-      Default: 0
-
-      Examples:
-        python3 src/extract_locators.py song.als --precision=0
-        python3 src/extract_locators.py song.als --precision=1
-        python3 src/extract_locators.py song.als --precision=3
-
-      Example output with --precision=0:
-        01:28
-
-      Example output with --precision=2:
-        01:28.42
-
-  --strip-keys
-      Remove a leading musical key in parentheses from each locator name.
-
-      Examples:
-        (G#) Blue Man & Blaze U & LUPEX - All Night Long
-        becomes:
-        Blue Man & Blaze U & LUPEX - All Night Long
-
-        (G♯) Blue Man & Blaze U & LUPEX - All Night Long
-        becomes:
-        Blue Man & Blaze U & LUPEX - All Night Long
-
-        (A) Jack Trades & Kadiri - Can You Be
-        becomes:
-        Jack Trades & Kadiri - Can You Be
-
-      Example:
-        python3 src/extract_locators.py song.als --strip-keys
-
-  --output=PATH
-  -o PATH
-      Output TSV path.
-      Default: <input filename>.txt in the current directory.
-
-      Examples:
-        python3 src/extract_locators.py song.als --output=locators.tsv
-        python3 src/extract_locators.py song.als --output=adjusted_locators.tsv
-        python3 src/extract_locators.py song.als -o locators.tsv
-
-  --time-header=LABEL
-      Use LABEL as the first TSV column heading.
-      Default: Time
-
-      Example:
-        python3 src/extract_locators.py song.als --time-header=Start
-
-  --label-header=LABEL
-      Use LABEL as the second TSV column heading.
-      Default: Locator Name
-
-      Example:
-        python3 src/extract_locators.py song.als --label-header=Title
-
-  --no-heading-row
-  --no-header
-      Omit the TSV heading row entirely.
-
-      Example:
-        python3 src/extract_locators.py song.als --no-heading-row
-
-  --columns=LIST
-      Select comma-separated TSV/JSON columns.
-      Default: time,label
-      Use all to include every available column.
-
-      Available columns:
-        time
-        label
-        tempo
-        song_position
-        time_signature
-        absolute_seconds
-        normalized_seconds
-        absolute_beats
-        bar_number
-        time_signature_section_start
-        locator_id
-        track_number
-
-      Examples:
-        python3 src/extract_locators.py song.als --columns=time,label,tempo
-        python3 src/extract_locators.py song.als --columns=all
-
-  --all-columns
-      Include every available TSV/JSON column.
-
-      Example:
-        python3 src/extract_locators.py song.als --all-columns
-
-  --include-tempo
-      Add the current tempo in BPM.
-
-  --include-song-position
-      Add the current bar.beat.sixteenth position.
-
-  --include-time-signature
-      Add the current time signature.
-
-  --include-absolute-seconds
-      Add elapsed seconds from the beginning of the session.
-
-  --include-normalized-seconds
-      Add seconds after earliest-locator normalization and before user offset.
-
-  --include-absolute-beats
-      Add the raw Ableton beat position.
-
-  --include-bar-number
-      Add the current bar number.
-
-  --include-time-signature-section-start
-      Add the song position where the current time signature began.
-
-  --include-locator-id
-      Add the Ableton locator ID.
-
-  --include-track-number
-      Add a sequential track number after sorting locators by time.
-
-      Example:
-        python3 src/extract_locators.py song.als --include-tempo --include-song-position --include-time-signature
-
-  --track-number-offset=NUMBER
-      Offset exported track numbers. Use 4 to start at 5, or -1 to start at 0.
-
-      Example:
-        python3 src/extract_locators.py song.als --include-track-number --track-number-offset=4
-
-  --mixcloud=PATH
-  -m PATH
-      Also write a Mixcloud-compatible timestamped tracklist.
-
-      Format:
-        MM:SS Locator Name
-
-      Examples:
-        python3 src/extract_locators.py song.als --mixcloud=mixcloud.txt
-        python3 src/extract_locators.py song.als -m mixcloud.txt
-
-  --csv=PATH
-      Also write a standard comma-separated CSV file.
-
-      CSV uses the same selected columns, precision, heading labels, and
-      heading-row behavior as TSV. This is a normal comma CSV, unlike the
-      Adobe Audition marker export, which intentionally uses tab-separated
-      marker rows inside a .csv-named file.
-
-      Example:
-        python3 src/extract_locators.py song.als --csv=locators.csv
-
-  --audition=PATH
-  -a PATH
-      Also write an Adobe Audition marker import file.
-
-      Audition marker files are commonly saved with a .csv extension, but the
-      marker table itself is tab-separated text. That CSV filename / TSV
-      contents mismatch is intentional for Audition compatibility.
-
-      Columns:
-        Name    Start    Duration    Time Format    Type    Description
-
-      Ableton locators are exported as zero-duration Cue markers.
-
-      Examples:
-        python3 src/extract_locators.py song.als --audition=audition_markers.csv
-        python3 src/extract_locators.py song.als -a audition_markers.csv
-
-  --webvtt=PATH
-      Also write WebVTT chapter cues.
-
-      Each cue starts at a locator and ends at the next locator. The final cue
-      ends one second after the final locator because Extract Locators does not
-      know the rendered media duration.
-
-      Example:
-        python3 src/extract_locators.py song.als --webvtt=chapters.vtt
-
-  --cue=PATH
-      Also write a CUE sheet using each locator as TRACK INDEX 01.
-
-      Example:
-        python3 src/extract_locators.py song.als --cue=tracks.cue
-
-  --cue-audio=PATH
-      Set the audio filename used by the CUE sheet FILE line.
-      Default: <input session stem>.wav
-
-      Example:
-        python3 src/extract_locators.py song.als --cue=tracks.cue --cue-audio=render.wav
-
-  --markdown=PATH
-      Also write a Markdown locator report.
-
-      Markdown uses the same selected columns as TSV, CSV, and JSON, and always
-      includes a table heading row.
-
-      Example:
-        python3 src/extract_locators.py song.als --columns=all --markdown=locators.md
-
-  --midi=PATH
-      Also write a Standard MIDI file containing locator marker meta events.
-
-      MIDI marker placement uses the locator's absolute Ableton beat position,
-      not the normalized/output timestamp. The --add-offset option is meant for
-      timestamped text formats and does not shift MIDI beat positions.
-
-      Example:
-        python3 src/extract_locators.py song.als --midi=markers.mid
-
-  --reaper=PATH
-      Also write a REAPER marker CSV file.
-
-      The file uses REAPER's Region/Marker Manager CSV columns:
-          #,Name,Start,End,Length
-
-      Locator rows are exported as markers, so End and Length are blank.
-
-      Example:
-        python3 src/extract_locators.py song.als --reaper=markers.csv
-
-  --midi-timing-map
-      Add tempo and time-signature meta events to the Standard MIDI export.
-      Requires --midi. Locator markers remain in the same file.
-
-      Standard MIDI represents tempo with discrete tempo meta events. Ableton
-      linear tempo ramps are therefore exported as their tempo automation
-      points rather than as continuous ramp curves.
-
-      Example:
-        python3 src/extract_locators.py song.als --midi=markers.mid --midi-timing-map
-
-  --logic-midi=PATH
-  --pro-tools-midi=PATH
-  --cubase-midi=PATH
-  --nuendo-midi=PATH
-      Write a DAW-named Standard MIDI marker-map preset.
-
-      These options use the same MIDI marker events as --midi, and they include
-      tempo and time-signature meta events automatically so imported markers can
-      follow Ableton's musical timeline in DAWs that read MIDI marker maps.
-
-      DAW import behavior varies. Some DAWs import markers only into an empty
-      marker/memory-location list, and importing a timing map may affect the
-      receiving session's tempo or meter data. Treat these as marker-map source
-      files and review the DAW's import settings before applying them to an
-      existing production session.
-
-      Examples:
-        python3 src/extract_locators.py song.als --logic-midi=logic_markers.mid
-        python3 src/extract_locators.py song.als --pro-tools-midi=pro_tools_markers.mid
-        python3 src/extract_locators.py song.als --cubase-midi=cubase_markers.mid
-        python3 src/extract_locators.py song.als --nuendo-midi=nuendo_markers.mid
-
-  --json=PATH
-  -j PATH
-      Also write a JSON locator export.
-
-      Examples:
-        python3 src/extract_locators.py song.als --json=locators.json
-        python3 src/extract_locators.py song.als -j locators.json
-
-  --json-format=pretty|compact
-      Choose whether JSON is human-readable or compact.
-      Default: pretty
-
-Combined examples:
-  python3 src/extract_locators.py song.als --add-offset=27.5 --precision=2 --output=adjusted_locators.tsv
-  python3 src/extract_locators.py song.als --time-header=TIME --label-header=LABEL --output=ensemble.tsv
-  python3 src/extract_locators.py song.als --no-heading-row --output=locators.tsv
-  python3 src/extract_locators.py song.als --add-offset=27 --mixcloud=mixcloud.txt
-  python3 src/extract_locators.py song.als --columns=all --csv=locators.csv
-  python3 src/extract_locators.py song.als --add-offset=27 --audition=audition_markers.csv
-  python3 src/extract_locators.py song.als --webvtt=chapters.vtt
-  python3 src/extract_locators.py song.als --cue=tracks.cue --cue-audio=render.wav
-  python3 src/extract_locators.py song.als --columns=all --markdown=locators.md
-  python3 src/extract_locators.py song.als --reaper=markers.csv
-  python3 src/extract_locators.py song.als --midi=markers.mid
-  python3 src/extract_locators.py song.als --midi=markers.mid --midi-timing-map
-  python3 src/extract_locators.py song.als --logic-midi=logic_markers.mid --pro-tools-midi=pro_tools_markers.mid
-  python3 src/extract_locators.py song.als --include-tempo --include-song-position --include-time-signature --output=locators.tsv
-  python3 src/extract_locators.py song.als --columns=all --json=locators.json
-  python3 src/extract_locators.py song.als --add-offset=27 --strip-keys --output=locators.tsv --mixcloud=mixcloud.txt --csv=locators.csv --audition=audition_markers.csv --webvtt=chapters.vtt --cue=tracks.cue --markdown=locators.md --reaper=markers.csv --midi=markers.mid
-
-CLI reporting:
-  - Reports are headed "Locator Extraction Results".
-  - Every written file is listed with the label "output".
-  - Elapsed processing time is shown with three decimal places.
-  - Successful runs exit with status code 0.
-  - Runtime/user-data errors exit with status code 1.
-  - Command-line argument errors exit with status code 2.
 """
 
 import argparse
@@ -628,6 +192,7 @@ class LocatorToolError(Exception):
     """A user-facing problem that should be reported without a traceback."""
 
     def __init__(self, problem, details=None):
+        """Store the summary and structured detail rows for CLI reporting."""
         super().__init__(problem)
         self.problem = problem
         self.details = details or []
@@ -643,6 +208,7 @@ class LocatorArgumentParser(argparse.ArgumentParser):
     """
 
     def error(self, message):
+        """Report a usage error in the standard CLI format and exit with 2."""
         self.print_usage(sys.stderr)
         print_report(
             "error",
@@ -980,9 +546,11 @@ def parse_als_xml_stream(xml_stream, chunk_size=LOCATOR_XML_READ_CHUNK_SIZE):
     }
 
     def parent_is(tag_name):
+        """Return whether the current XML element has the requested parent."""
         return len(path) >= 2 and path[-2] == tag_name
 
     def parent_chain_is(parent_name, grandparent_name):
+        """Match the current element's parent and grandparent tags."""
         return (
             len(path) >= 3
             and path[-2] == parent_name
@@ -990,6 +558,7 @@ def parse_als_xml_stream(xml_stream, chunk_size=LOCATOR_XML_READ_CHUNK_SIZE):
         )
 
     def at_main_time_signature_manual():
+        """Return whether the path targets MainTrack's manual time signature."""
         return (
             len(path) >= 5
             and path[-5] == "MainTrack"
@@ -1000,6 +569,13 @@ def parse_als_xml_stream(xml_stream, chunk_size=LOCATOR_XML_READ_CHUNK_SIZE):
         )
 
     def start_element(name, attrs):
+        """
+        Collect relevant attributes when an XML element opens.
+
+        The callback deliberately records only candidate automation and locator
+        state. Container-close handling decides when a complete record is safe
+        to append to the exported collections.
+        """
         nonlocal time_signature_manual_value
 
         path.append(name)
@@ -1008,6 +584,8 @@ def parse_als_xml_stream(xml_stream, chunk_size=LOCATOR_XML_READ_CHUNK_SIZE):
             return
 
         if name == "AutomationEnvelope":
+            # The descendant PointeeId identifies the envelope. Buffer both event
+            # shapes until end_element can classify the completed candidate.
             state["inside_tempo_candidate"] = True
             state["tempo_candidate_pointee_id"] = None
             state["tempo_candidate_float_events"] = []
@@ -1064,11 +642,14 @@ def parse_als_xml_stream(xml_stream, chunk_size=LOCATOR_XML_READ_CHUNK_SIZE):
             )
 
     def end_element(name):
+        """Finalize complete automation or locator records as containers close."""
         if name not in LOCATOR_XML_INTERESTING_END_TAGS:
             path.pop()
             return
 
         if name == "AutomationEnvelope":
+            # Only the target IDs used by Live's tempo and time-signature
+            # automation are meaningful to locator timing; other envelopes drop.
             if state["tempo_candidate_pointee_id"] == TEMPO_AUTOMATION_POINTEE_ID:
                 for beat_value, bpm_value in state["tempo_candidate_float_events"]:
                     beat = float_value(beat_value, 0.0, "tempo event beat")
@@ -1420,6 +1001,7 @@ def build_beat_to_seconds_converter(tempo_changes):
         seconds_at_beat.append(total_seconds)
 
     def beat_to_seconds(beat):
+        """Convert one beat using cached anchors and linear-tempo integration."""
         first_beat, first_bpm = tempo_changes[0]
 
         if beat <= first_beat:
@@ -1474,6 +1056,7 @@ def build_tempo_at_beat_lookup(tempo_changes):
     beat_positions = [beat for beat, _bpm in tempo_changes]
 
     def tempo_at_beat(beat):
+        """Return the active or linearly interpolated BPM at one beat."""
         first_beat, first_bpm = tempo_changes[0]
 
         if beat <= first_beat:
@@ -1532,9 +1115,11 @@ def build_time_signature_context(time_signature_events):
         section_start_bars.append(previous_start_bar + bars_since_previous)
 
     def event_index_at_beat(beat):
+        """Return the index of the time signature active at one beat."""
         return max(0, bisect.bisect_right(event_beats, beat) - 1)
 
     def position_parts_at_beat(beat):
+        """Return signature index, bar, displayed beat, and sixteenth position."""
         event_index = event_index_at_beat(beat)
         event = time_signature_events[event_index]
         section_offset = max(0.0, beat - event.beat)
@@ -1554,6 +1139,7 @@ def build_time_signature_context(time_signature_events):
         return event_index, bar_number, displayed_beat, sixteenth
 
     def format_position_parts(bar_number, displayed_beat, sixteenth):
+        """Format musical position parts using Ableton's bar.beat.sixteenth form."""
         return f"{bar_number}.{displayed_beat}.{sixteenth}"
 
     section_start_positions = []
@@ -1567,6 +1153,7 @@ def build_time_signature_context(time_signature_events):
         )
 
     def context_at_beat(beat):
+        """Build the complete active time-signature context for one beat."""
         event_index, bar_number, displayed_beat, sixteenth = position_parts_at_beat(beat)
         event = time_signature_events[event_index]
 

@@ -1,67 +1,16 @@
 #!/usr/bin/env python3
 
 """
-audit_project.py
-Version: 2026.07.14
+Build a repeatable Ableton project audit bundle.
+
+The audit combines project inventory, health findings, and an optional semantic
+diff without shelling out to the individual CLIs. It parses the current manifest
+once and reuses that object across reports to avoid hidden full-project passes.
+
+See ``docs/Project Audit Bundle.md`` for CLI and output documentation.
 
 Author: Evan Musial <evan@evan.engineer>
 License: Creative Commons Attribution-ShareAlike 4.0 International
-
-License meaning:
-  - This license requires that reusers give credit to the creator.
-  - It allows reusers to distribute, remix, adapt, and build upon the material
-    in any medium or format, even for commercial purposes.
-  - If others remix, adapt, or build upon the material, they must license the
-    modified material under identical terms.
-
-Version 2026.07.14 notes:
-  - Confirms compatibility with Ableton Live 12.4.3 through the full CLI
-    compatibility suite.
-  - Includes the unified assets.tsv and JSON asset inventory in audit bundles.
-  - Carries missing/external preset findings and Ableton creator/version metadata
-    into the reused Project Health outputs.
-
-Version 2026.06.30 notes:
-  - Adds a project audit bundle for archive, collaboration, and handoff review.
-  - Reuses the parsed Project Manifest object for health checks and audit
-    summaries, so the default audit does not rerun the manifest parser for each
-    report.
-  - Writes a top-level Markdown and JSON audit, Project Manifest outputs,
-    Project Health outputs, and optional Semantic ALS Diff outputs when a
-    baseline file is provided.
-
-What this script does:
-  Ableton Live Tools already has focused tools for project inventory, health
-  checks, and semantic diffs. Project Audit Bundle stitches those checks into
-  one repeatable handoff folder without shelling out to the individual CLIs.
-
-Default output:
-  If --output-dir is omitted, the script writes a directory named
-  <input filename>.project-audit in the current working directory.
-
-  Files written by default:
-    project_audit.md
-    project_audit.json
-    project_inventory.md
-    project_manifest.json
-    project_health.md
-    project_health.json
-    assets.tsv
-    tracks.tsv
-    clips.tsv
-    samples.tsv
-    devices.tsv
-    plugins_by_author.tsv
-    plugins_by_name.tsv
-
-  If --before is provided, the bundle also includes:
-    semantic_diff.md
-    semantic_diff.json
-
-Performance note:
-  The audit parses the current project manifest once and reuses that result for
-  the manifest, health, and top-level audit files. Full locator/timeline exports
-  remain separate commands so this bundle does not add hidden full-output passes.
 """
 
 import argparse
@@ -127,6 +76,7 @@ class AuditArgumentParser(argparse.ArgumentParser):
     """Argparse subclass that reports argument errors in the tool's style."""
 
     def error(self, message):
+        """Report a usage error in the standard CLI format and exit with 2."""
         print_report(
             "error",
             [("problem", message)],

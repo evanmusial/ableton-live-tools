@@ -1,235 +1,17 @@
 #!/usr/bin/env python3
 
 """
-extract_timeline.py
-Version: 2026.06.15
+Export a precise event timeline from an Ableton arrangement.
+
+The parser streams gzip-compressed or plain ALS XML and combines tempo ramps,
+time signatures, session and clip keys, locators, clip boundaries, optional
+grids, and detected song end into one ordered timeline. Wall-clock positions and
+sample indexes are derived from the normalized tempo map after parsing.
+
+See ``docs/Extract Timeline.md`` for CLI and timing-model documentation.
 
 Author: Evan Musial <evan@evan.engineer>
 License: Creative Commons Attribution-ShareAlike 4.0 International
-
-License meaning:
-  - This license requires that reusers give credit to the creator.
-  - It allows reusers to distribute, remix, adapt, and build upon the material
-    in any medium or format, even for commercial purposes.
-  - If others remix, adapt, or build upon the material, they must license the
-    modified material under identical terms.
-
-Version 2026.06.15 notes:
-  - Precomputes time-signature section positions so repeated timeline rows do
-    not recalculate section-start labels.
-  - Uses a compact timing context object instead of per-row timing dictionaries.
-  - Builds optional details dictionaries only when the selected output columns
-    include details.
-  - Reuses a generated bar row's timing values for the matching beat-one row in
-    beat-grid exports.
-  - Against main on RYM_2026-03.als, final median benchmark results showed no
-    material regression: locator-only improved by about 0.3%, beat-grid core
-    improved by about 0.8%, and full TSV + JSON improved by about 0.5%.
-  - Tested and validated with Ableton Live 12.4.2 sessions.
-
-Version 2026.05.31 notes:
-  - Added tag-name fast paths to the XML start and end handlers so unrelated
-    Ableton tags skip deeper parser-state checks.
-  - Replaced fixed tuple-slice path checks with direct parent/depth checks.
-  - Added target-aware parsing so lightweight exports can skip clip/sample
-    structures when selected event types and columns do not need them.
-  - Added standard-library unittest CLI validation under tests/.
-  - Added scripts/benchmark_validation.py for repeatable validation benchmarks.
-  - On the RYM_2026-03.als locator-only benchmark, median elapsed time improved
-    from 1.568s to 0.698s, about 55.5% faster.
-  - On the RYM_2026-03.als beat-grid core benchmark, median elapsed time
-    improved from 1.631s to 0.773s, about 52.6% faster.
-  - On the RYM_2026-03.als full TSV + JSON benchmark, median elapsed time
-    improved from 1.645s to 0.783s, about 52.4% faster.
-  - Confirmed full timeline TSV and core beat-grid TSV output remain
-    byte-identical to main. Full timeline JSON differs only in expected
-    script-version metadata.
-
-Version 2026.05.29 notes:
-  - Added docs/Performance and Output Roadmap.md with profiling baselines,
-    optimization candidates, output-format candidates, and validation notes.
-  - Re-ran the usual validation checks against examples/validation/RYM_2026-03.als
-    on Python 3.14.5.
-  - Confirmed locator timeline rows match Extract Locators metadata at matching
-    precision.
-  - Confirmed full TSV/JSON timeline export and beat-grid timeline export
-    complete successfully.
-  - Confirmed CLI success and missing-file error paths return script-friendly
-    exit codes.
-  - Tested with Ableton Live 12.4.1, released May 28, 2026.
-
-Version 2026.05.21 notes:
-  - Initial Extract Timeline release.
-  - Exports an interleaved, beat-sorted Ableton Live arrangement timeline with
-    tempo events, tempo-ramp intervals, time signatures, detected key/scale
-    events, locators, clip starts, clip ends, and a detected song-end row.
-  - Adds optional bar and beat grid rows with --grid=bars or --grid=beats.
-  - Calculates real wall-clock time with fractional seconds while respecting
-    tempo changes and linear tempo ramps.
-  - Calculates sample indexes when a project/sample rate can be detected or
-    supplied by the user.
-  - Detects sample-rate metadata from Ableton sample references and, when the
-    referenced audio files are available, detects sample rate and bit depth from
-    WAV, AIFF, AIFC, and FLAC headers.
-  - Writes TSV and optional compact or human-readable JSON.
-
-What this script does:
-  Ableton Live .als files are XML documents, usually gzip-compressed. This tool
-  streams that XML and builds a single chronological event list for the
-  arrangement. The list is intended for technical review, cue sheets, archive
-  notes, post-production validation, and any workflow that needs a precise map
-  from Ableton beats to real elapsed time.
-
-Timing model:
-  - Ableton stores arrangement positions in quarter-note beat units.
-  - Constant tempo segments convert with beats * 60 / BPM.
-  - Linear tempo ramps integrate 60 / BPM over the ramp interval. That is why
-    the ramp math uses a logarithm instead of a simple average tempo.
-  - Time signatures affect musical position labels and grid generation, but
-    they do not affect elapsed seconds directly.
-  - Sample indexes are derived after elapsed seconds are known:
-        sample_index = round(wall_seconds * sample_rate)
-    Bit depth is useful metadata, but it does not change the sample-index math.
-
-Default output columns:
-  wall_time
-  wall_seconds
-  sample_index
-  event_type
-  song_position
-  absolute_beats
-  tempo_bpm
-  time_signature
-  key
-  name
-  value
-  event_id
-  source
-  source_path
-  sample_rate
-  bit_depth
-  duration_seconds
-  details
-
-Arguments:
-  als_path
-      Path to the Ableton .als file.
-
-      Example:
-        python3 src/extract_timeline.py path/to/song.als
-
-  --output=PATH
-  -o PATH
-      Output TSV path.
-      Default: <input filename>.timeline.tsv in the current directory.
-
-      Examples:
-        python3 src/extract_timeline.py song.als --output=song.timeline.tsv
-        python3 src/extract_timeline.py song.als -o song.timeline.tsv
-
-  --json=PATH
-  -j PATH
-      Also write a JSON timeline export.
-
-      Examples:
-        python3 src/extract_timeline.py song.als --json=song.timeline.json
-        python3 src/extract_timeline.py song.als -j song.timeline.json
-
-  --json-format=pretty|compact
-      Choose whether JSON is human-readable or compact.
-      Default: pretty
-
-      Examples:
-        python3 src/extract_timeline.py song.als --json=song.timeline.json --json-format=pretty
-        python3 src/extract_timeline.py song.als --json=song.timeline.json --json-format=compact
-
-  --grid=none|bars|beats
-      Add musical grid rows to the exported timeline.
-      Default: none
-
-      none:
-        Do not emit grid rows.
-
-      bars:
-        Emit one bar row at every bar start.
-
-      beats:
-        Emit bar rows and beat rows. Bar starts and beat-one rows share the same
-        timing fields but remain separate rows, so the output stays one event
-        per row while grouping simultaneous events together.
-
-      Examples:
-        python3 src/extract_timeline.py song.als --grid=bars
-        python3 src/extract_timeline.py song.als --grid=beats
-
-  --precision=DECIMALS
-      Decimal places for wall_time, wall_seconds, beats, tempo, and durations.
-      Default: 6
-
-      Examples:
-        python3 src/extract_timeline.py song.als --precision=3
-        python3 src/extract_timeline.py song.als --precision=9
-
-  --sample-rate=HZ
-      Use HZ for sample-index calculations. When omitted, the tool uses an
-      automatically detected sample rate only if the detected rate is
-      unambiguous.
-
-      Example:
-        python3 src/extract_timeline.py song.als --sample-rate=48000
-
-  --end-beat=BEAT
-      Override the beat where grid generation and the song-end row stop.
-      By default, the end beat is detected from locators, tempo events, time
-      signature events, and arrangement clip ends.
-
-      Example:
-        python3 src/extract_timeline.py song.als --grid=beats --end-beat=4096
-
-  --event-types=LIST
-      Select comma-separated event types.
-      Default: all
-
-      Available event types:
-        tempo
-        tempo_ramp
-        time_signature
-        key
-        locator
-        clip_start
-        clip_end
-        song_end
-
-      Examples:
-        python3 src/extract_timeline.py song.als --event-types=tempo,time_signature,locator
-        python3 src/extract_timeline.py song.als --event-types=all
-
-  --columns=LIST
-      Select comma-separated TSV/JSON columns.
-      Default: all
-
-      Example:
-        python3 src/extract_timeline.py song.als --columns=wall_time,event_type,name,value
-
-  --no-heading-row
-  --no-header
-      Omit the TSV heading row entirely.
-
-      Example:
-        python3 src/extract_timeline.py song.als --no-heading-row
-
-Combined examples:
-  python3 src/extract_timeline.py song.als --grid=beats --json=song.timeline.json
-  python3 src/extract_timeline.py song.als --event-types=tempo,time_signature,key,locator --output=core.tsv
-  python3 src/extract_timeline.py song.als --grid=bars --precision=3 --sample-rate=48000
-
-CLI reporting:
-  - Reports are headed "Timeline Extraction Results".
-  - Every written file is listed with the label "output".
-  - Elapsed processing time is shown with three decimal places.
-  - Successful runs exit with status code 0.
-  - Runtime/user-data errors exit with status code 1.
-  - Command-line argument errors exit with status code 2.
 """
 
 import argparse
@@ -443,6 +225,7 @@ class TimelineToolError(Exception):
     """A user-facing problem that should be reported without a traceback."""
 
     def __init__(self, problem, details=None):
+        """Store the summary and structured detail rows for CLI reporting."""
         super().__init__(problem)
         self.problem = problem
         self.details = details or []
@@ -458,6 +241,7 @@ class TimelineArgumentParser(argparse.ArgumentParser):
     """
 
     def error(self, message):
+        """Report a usage error in the standard CLI format and exit with 2."""
         self.print_usage(sys.stderr)
         print_report(
             "error",
@@ -922,9 +706,11 @@ def parse_als_xml_stream(xml_stream, chunk_size=1024 * 1024, parse_options=None)
     }
 
     def parent_is(tag_name):
+        """Return whether the current XML element has the requested parent."""
         return len(path) >= 2 and path[-2] == tag_name
 
     def parent_chain_is(parent_name, grandparent_name):
+        """Match the current element's parent and grandparent tags."""
         return (
             len(path) >= 3
             and path[-2] == parent_name
@@ -932,6 +718,7 @@ def parse_als_xml_stream(xml_stream, chunk_size=1024 * 1024, parse_options=None)
         )
 
     def at_main_time_signature_manual():
+        """Return whether the path targets MainTrack's manual time signature."""
         return (
             len(path) >= 5
             and path[-5] == "MainTrack"
@@ -942,6 +729,7 @@ def parse_als_xml_stream(xml_stream, chunk_size=1024 * 1024, parse_options=None)
         )
 
     def at_session_scale_child(tag_name):
+        """Match a direct child of the LiveSet-level scale-information block."""
         return (
             len(path) >= 4
             and path[-4] == "Ableton"
@@ -951,6 +739,7 @@ def parse_als_xml_stream(xml_stream, chunk_size=1024 * 1024, parse_options=None)
         )
 
     def at_session_in_key():
+        """Match the LiveSet-level InKey value without accepting clip values."""
         return (
             len(path) >= 3
             and path[-3] == "Ableton"
@@ -959,6 +748,13 @@ def parse_als_xml_stream(xml_stream, chunk_size=1024 * 1024, parse_options=None)
         )
 
     def start_element(name, attrs):
+        """
+        Collect relevant attributes while maintaining container-scoped state.
+
+        Exact path checks keep session and clip scale values separate. Candidate
+        automation, locator, and clip records remain buffered until their closing
+        tag proves that the complete container has been seen.
+        """
         nonlocal manual_time_signature_value
 
         path.append(name)
@@ -973,6 +769,8 @@ def parse_als_xml_stream(xml_stream, chunk_size=1024 * 1024, parse_options=None)
             return
 
         if name == "AutomationEnvelope":
+            # The descendant PointeeId identifies the envelope. Buffer both event
+            # shapes until end_element can classify the completed candidate.
             state["inside_automation_candidate"] = True
             state["automation_pointee_id"] = None
             state["automation_float_events"] = []
@@ -1120,6 +918,9 @@ def parse_als_xml_stream(xml_stream, chunk_size=1024 * 1024, parse_options=None)
             if not parse_options.collect_clip_media:
                 return
 
+            # SampleRef and FileRef contain generic child tag names. Track their
+            # opening depths so unrelated Path or metadata elements cannot leak
+            # into the active clip record.
             if name == "SampleRef":
                 state["inside_sample_ref"] = True
                 state["sample_ref_depth"] = len(path)
@@ -1157,11 +958,14 @@ def parse_als_xml_stream(xml_stream, chunk_size=1024 * 1024, parse_options=None)
                 return
 
     def end_element(name):
+        """Commit complete records and clear depth-scoped state on container exit."""
         if name not in TIMELINE_XML_INTERESTING_END_TAGS:
             path.pop()
             return
 
         if name == "AutomationEnvelope":
+            # Only the target IDs used by Live's tempo and time-signature
+            # automation are meaningful to timeline output; other envelopes drop.
             if state["automation_pointee_id"] == TEMPO_AUTOMATION_POINTEE_ID:
                 for beat_value, bpm_value in state["automation_float_events"]:
                     beat = float_value(beat_value, 0.0, "tempo event beat")
@@ -1539,6 +1343,7 @@ def build_beat_to_seconds_converter(tempo_events):
         seconds_at_beat.append(total_seconds)
 
     def beat_to_seconds(beat):
+        """Convert one beat using cached anchors and linear-tempo integration."""
         first = tempo_events[0]
 
         if beat <= first.beat:
@@ -1583,6 +1388,7 @@ def build_tempo_at_beat_lookup(tempo_events):
     beat_positions = [event.beat for event in tempo_events]
 
     def tempo_at_beat(beat):
+        """Return the active or linearly interpolated BPM at one beat."""
         first = tempo_events[0]
 
         if beat <= first.beat:
@@ -1637,9 +1443,11 @@ def build_time_signature_context(time_signature_events):
         section_start_bars.append(previous_start_bar + bars_since_previous)
 
     def event_index_at_beat(beat):
+        """Return the index of the time signature active at one beat."""
         return max(0, bisect.bisect_right(event_beats, beat) - 1)
 
     def position_parts_at_beat(beat):
+        """Return signature index, bar, displayed beat, and sixteenth position."""
         event_index = event_index_at_beat(beat)
         event = time_signature_events[event_index]
         section_offset = max(0.0, beat - event.beat)
@@ -1659,6 +1467,7 @@ def build_time_signature_context(time_signature_events):
         return event_index, bar_number, displayed_beat, sixteenth
 
     def format_position_parts(bar_number, displayed_beat, sixteenth):
+        """Format musical position parts using Ableton's bar.beat.sixteenth form."""
         return f"{bar_number}.{displayed_beat}.{sixteenth}"
 
     section_start_positions = []
@@ -1672,6 +1481,7 @@ def build_time_signature_context(time_signature_events):
         )
 
     def context_at_beat(beat):
+        """Build the complete active time-signature context for one beat."""
         event_index, bar_number, displayed_beat, sixteenth = position_parts_at_beat(
             beat
         )

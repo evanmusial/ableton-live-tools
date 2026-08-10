@@ -1,74 +1,16 @@
 #!/usr/bin/env python3
 
 """
-diff_als_semantic.py
-Version: 2026.06.15
+Compare two Ableton sessions by project meaning instead of raw XML text.
+
+The diff builds stable signatures for the inventory categories the parsers
+understand deliberately, including tracks, clips, samples, devices, locators,
+tempo events, and time signatures. Incidental serialization changes are ignored.
+
+See ``docs/Semantic ALS Diff.md`` for CLI and comparison documentation.
 
 Author: Evan Musial <evan@evan.engineer>
 License: Creative Commons Attribution-ShareAlike 4.0 International
-
-License meaning:
-  - This license requires that reusers give credit to the creator.
-  - It allows reusers to distribute, remix, adapt, and build upon the material
-    in any medium or format, even for commercial purposes.
-  - If others remix, adapt, or build upon the material, they must license the
-    modified material under identical terms.
-
-Version 2026.06.15 notes:
-  - Initial Semantic ALS Diff release.
-  - Compares two Ableton Live .als files using extracted project meaning rather
-    than raw XML byte/text differences.
-  - Reports summary-count changes plus added/removed tracks, clips, samples,
-    devices/plugins, locators, tempo events, and time-signature events.
-  - Writes Markdown and JSON diff reports for review, archiving, and automation.
-  - Tested and validated with Ableton Live 12.4.2 sessions.
-
-What this script does:
-  Ableton Live .als files contain many XML details that are not useful when a
-  human wants to know what changed musically or operationally between two sets.
-  Semantic ALS Diff builds compact signatures from the same parser data used by
-  the locator and manifest tools, then compares those signatures as inventories.
-
-  This first release intentionally focuses on project-meaning categories that
-  are already parsed reliably: high-level counts, tracks, clips, sample
-  references, devices/plugins, locators, tempo map entries, and time signatures.
-  Mixer, routing, automation, and device-parameter comparisons can be added
-  later once those fields are parsed deliberately.
-
-Default behavior:
-  - Prints a compact terminal report headed "Semantic ALS Diff Results".
-  - Exits 0 when no semantic differences are detected.
-  - Exits 1 when semantic differences are detected.
-  - Exits 2 for command-line argument errors.
-
-Arguments:
-  before_als
-      Path to the older/baseline Ableton .als file.
-
-  after_als
-      Path to the newer/comparison Ableton .als file.
-
-      Example:
-        python3 src/diff_als_semantic.py before.als after.als
-
-  --markdown=PATH
-      Write a human-readable Markdown semantic diff report.
-
-      Example:
-        python3 src/diff_als_semantic.py before.als after.als --markdown=diff.md
-
-  --json=PATH
-      Write a JSON semantic diff report for automation and CI systems.
-
-      Example:
-        python3 src/diff_als_semantic.py before.als after.als --json=diff.json
-
-  --json-format=pretty|compact
-      Choose whether JSON is human-readable or compact.
-      Default: pretty
-
-  --no-fail-on-diff
-      Return exit code 0 even when semantic differences are found.
 """
 
 import argparse
@@ -126,6 +68,7 @@ class DiffArgumentParser(argparse.ArgumentParser):
     """Argparse subclass that reports argument errors in the tool's style."""
 
     def error(self, message):
+        """Report a usage error in the standard CLI format and exit with 2."""
         print_report(
             "error",
             [("problem", message)],

@@ -66,6 +66,7 @@ suite exercises all six CLIs against the canonical project fixture with Live
 ## Project Notes
 
 - [Backlog](docs/Backlog.md): Tracks delivered tools and future tool ideas.
+- [Code Commenting Style](<docs/Code Commenting Style.md>): Defines the concise, intent-focused docstring and inline-comment standard used by production code, maintenance scripts, and tests.
 - [Performance and Output Roadmap](<docs/Performance and Output Roadmap.md>): Tracks profiling results, optimization candidates, validation notes, and candidate export formats for future releases.
 
 ## Testing

@@ -1,3 +1,5 @@
+"""End-to-end regression tests for the public Ableton Live Tools CLIs."""
+
 import gzip
 import json
 import os
@@ -29,6 +31,7 @@ class CliValidationTests(unittest.TestCase):
     """
 
     def run_cli(self, *args, check=True):
+        """Run a CLI without bytecode side effects and optionally require success."""
         env = os.environ.copy()
         env["PYTHONDONTWRITEBYTECODE"] = "1"
 
@@ -50,11 +53,13 @@ class CliValidationTests(unittest.TestCase):
         return result
 
     def assert_files_match(self, expected_path, actual_path):
+        """Assert that two UTF-8 text fixtures match exactly."""
         expected = Path(expected_path).read_text(encoding="utf-8")
         actual = Path(actual_path).read_text(encoding="utf-8")
         self.assertEqual(actual, expected)
 
     def assert_binary_files_match(self, expected_path, actual_path):
+        """Assert that two binary output fixtures match exactly."""
         expected = Path(expected_path).read_bytes()
         actual = Path(actual_path).read_bytes()
         self.assertEqual(actual, expected)
