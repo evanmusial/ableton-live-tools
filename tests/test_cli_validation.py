@@ -64,6 +64,28 @@ class CliValidationTests(unittest.TestCase):
         actual = Path(actual_path).read_bytes()
         self.assertEqual(actual, expected)
 
+    def write_modified_fixture(self, output_path, replacements):
+        """Write a temporary ALS fixture with exact compressed XML replacements."""
+        xml_payload = gzip.decompress(ALS_PATH.read_bytes())
+
+        for old_payload, new_payload in replacements:
+            self.assertIn(old_payload, xml_payload)
+            xml_payload = xml_payload.replace(old_payload, new_payload, 1)
+
+        Path(output_path).write_bytes(gzip.compress(xml_payload))
+
+    def write_creator_fixture(self, output_path, creator):
+        """Write a temporary ALS fixture with a synthetic Ableton creator string."""
+        self.write_modified_fixture(
+            output_path,
+            [
+                (
+                    b'Creator="Ableton Live 12.3.6"',
+                    f'Creator="{creator}"'.encode("utf-8"),
+                )
+            ],
+        )
+
     def test_extract_locators_highres_fixtures_match(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -461,6 +483,52 @@ class CliValidationTests(unittest.TestCase):
                 self.assertEqual(section["added_count"], 0, section["name"])
                 self.assertEqual(section["removed_count"], 0, section["name"])
 
+    def test_semantic_diff_detects_locator_name_change(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            changed_path = temp_path / "RYM_2026-03_changed_locator.als"
+            json_path = temp_path / "semantic_diff.json"
+
+            self.write_modified_fixture(
+                changed_path,
+                [
+                    (
+                        b'<Name Value="DALEXO - Highs &amp; Lows" />',
+                        b'<Name Value="DALEXO - Highs &amp; Lows TEST" />',
+                    )
+                ],
+            )
+
+            result = self.run_cli(
+                DIFF_SCRIPT,
+                ALS_PATH,
+                changed_path,
+                "--json",
+                json_path,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 1)
+            self.assertTrue(json_path.exists())
+
+            diff = json.loads(json_path.read_text(encoding="utf-8"))
+            sections = {section["name"]: section for section in diff["sections"]}
+            locator_section = sections["locators"]
+
+            self.assertEqual(diff["status"], "different")
+            self.assertEqual(diff["change_count"], 2)
+            self.assertEqual(diff["summary_changes"], [])
+            self.assertEqual(locator_section["added_count"], 1)
+            self.assertEqual(locator_section["removed_count"], 1)
+            self.assertIn(
+                "DALEXO - Highs & Lows TEST",
+                locator_section["added"][0],
+            )
+            self.assertIn(
+                "DALEXO - Highs & Lows",
+                locator_section["removed"][0],
+            )
+
     def test_project_audit_bundle_writes_reused_reports(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "project_audit"
@@ -547,62 +615,138 @@ class CliValidationTests(unittest.TestCase):
             self.assertEqual(audit["semantic_diff"]["status"], "same")
             self.assertEqual(audit["semantic_diff"]["change_count"], 0)
 
-    def test_ableton_live_12_4_3_compatibility_across_all_clis(self):
+    def test_ableton_live_12_4_x_compatibility_across_all_clis(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
-            als_path = temp_path / "RYM_2026-03_Ableton_12.4.3.als"
-            xml_payload = gzip.decompress(ALS_PATH.read_bytes())
-            old_creator = b'Creator="Ableton Live 12.3.6"'
-            new_creator = b'Creator="Ableton Live 12.4.3"'
-            self.assertIn(old_creator, xml_payload)
-            als_path.write_bytes(gzip.compress(xml_payload.replace(old_creator, new_creator, 1)))
 
-            locators_path = temp_path / "locators.tsv"
-            timeline_path = temp_path / "timeline.tsv"
-            manifest_dir = temp_path / "manifest"
-            health_path = temp_path / "health.json"
-            diff_path = temp_path / "diff.json"
+            for creator_version in ("Ableton Live 12.4.3", "Ableton Live 12.4.5"):
+                with self.subTest(creator_version=creator_version):
+                    version_slug = creator_version.rsplit(" ", 1)[-1]
+                    als_path = temp_path / f"RYM_2026-03_Ableton_{version_slug}.als"
+                    self.write_creator_fixture(als_path, creator_version)
+
+                    locators_path = temp_path / f"{version_slug}_locators.tsv"
+                    timeline_path = temp_path / f"{version_slug}_timeline.tsv"
+                    manifest_dir = temp_path / f"{version_slug}_manifest"
+                    health_path = temp_path / f"{version_slug}_health.json"
+                    diff_path = temp_path / f"{version_slug}_diff.json"
+                    audit_dir = temp_path / f"{version_slug}_audit"
+
+                    self.run_cli(LOCATORS_SCRIPT, als_path, "--output", locators_path)
+                    self.run_cli(TIMELINE_SCRIPT, als_path, "--output", timeline_path)
+                    self.run_cli(MANIFEST_SCRIPT, als_path, "--output-dir", manifest_dir)
+                    self.run_cli(
+                        HEALTH_SCRIPT,
+                        als_path,
+                        "--fail-on=none",
+                        "--json",
+                        health_path,
+                    )
+                    self.run_cli(
+                        DIFF_SCRIPT,
+                        als_path,
+                        als_path,
+                        "--json",
+                        diff_path,
+                    )
+                    self.run_cli(
+                        AUDIT_SCRIPT,
+                        als_path,
+                        "--fail-on=none",
+                        "--output-dir",
+                        audit_dir,
+                    )
+
+                    manifest = json.loads(
+                        (manifest_dir / "project_manifest.json").read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                    health = json.loads(health_path.read_text(encoding="utf-8"))
+                    audit = json.loads(
+                        (audit_dir / "project_audit.json").read_text(encoding="utf-8")
+                    )
+
+                    self.assertTrue(locators_path.exists())
+                    self.assertTrue(timeline_path.exists())
+                    self.assertEqual(
+                        manifest["metadata"]["ableton"]["creator"],
+                        creator_version,
+                    )
+                    self.assertEqual(
+                        health["metadata"]["ableton"]["creator"],
+                        creator_version,
+                    )
+                    self.assertEqual(
+                        audit["metadata"]["ableton"]["creator"],
+                        creator_version,
+                    )
+                    self.assertEqual(
+                        json.loads(diff_path.read_text(encoding="utf-8"))["status"],
+                        "same",
+                    )
+
+    def test_project_health_and_audit_failure_thresholds(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            health_json = temp_path / "health.json"
+            health_pass_json = temp_path / "health_pass.json"
             audit_dir = temp_path / "audit"
+            audit_pass_dir = temp_path / "audit_pass"
 
-            self.run_cli(LOCATORS_SCRIPT, als_path, "--output", locators_path)
-            self.run_cli(TIMELINE_SCRIPT, als_path, "--output", timeline_path)
-            self.run_cli(MANIFEST_SCRIPT, als_path, "--output-dir", manifest_dir)
-            self.run_cli(
+            health_result = self.run_cli(
                 HEALTH_SCRIPT,
-                als_path,
+                ALS_PATH,
+                "--json",
+                health_json,
+                check=False,
+            )
+            health_pass_result = self.run_cli(
+                HEALTH_SCRIPT,
+                ALS_PATH,
                 "--fail-on=none",
                 "--json",
-                health_path,
+                health_pass_json,
+                check=False,
             )
-            self.run_cli(
-                DIFF_SCRIPT,
-                als_path,
-                als_path,
-                "--json",
-                diff_path,
-            )
-            self.run_cli(
+            audit_result = self.run_cli(
                 AUDIT_SCRIPT,
-                als_path,
-                "--fail-on=none",
+                ALS_PATH,
                 "--output-dir",
                 audit_dir,
+                check=False,
+            )
+            audit_pass_result = self.run_cli(
+                AUDIT_SCRIPT,
+                ALS_PATH,
+                "--fail-on=none",
+                "--output-dir",
+                audit_pass_dir,
+                check=False,
             )
 
-            manifest = json.loads(
-                (manifest_dir / "project_manifest.json").read_text(encoding="utf-8")
-            )
-            health = json.loads(health_path.read_text(encoding="utf-8"))
+            self.assertEqual(health_result.returncode, 1)
+            self.assertEqual(health_pass_result.returncode, 0)
+            self.assertEqual(audit_result.returncode, 1)
+            self.assertEqual(audit_pass_result.returncode, 0)
+
+            health = json.loads(health_json.read_text(encoding="utf-8"))
+            health_pass = json.loads(health_pass_json.read_text(encoding="utf-8"))
             audit = json.loads(
                 (audit_dir / "project_audit.json").read_text(encoding="utf-8")
             )
+            audit_pass = json.loads(
+                (audit_pass_dir / "project_audit.json").read_text(encoding="utf-8")
+            )
 
-            self.assertTrue(locators_path.exists())
-            self.assertTrue(timeline_path.exists())
-            self.assertEqual(manifest["metadata"]["ableton"]["creator"], "Ableton Live 12.4.3")
-            self.assertEqual(health["metadata"]["ableton"]["creator"], "Ableton Live 12.4.3")
-            self.assertEqual(audit["metadata"]["ableton"]["creator"], "Ableton Live 12.4.3")
-            self.assertEqual(json.loads(diff_path.read_text(encoding="utf-8"))["status"], "same")
+            self.assertEqual(health["status"], "critical")
+            self.assertEqual(health["exit_code"], 1)
+            self.assertEqual(health_pass["status"], "critical")
+            self.assertEqual(health_pass["exit_code"], 0)
+            self.assertEqual(audit["status"], "critical")
+            self.assertEqual(audit["exit_code"], 1)
+            self.assertEqual(audit_pass["status"], "critical")
+            self.assertEqual(audit_pass["exit_code"], 0)
 
     def test_missing_input_returns_error_exit_code(self):
         missing_file = REPO_ROOT / "examples" / "validation" / "missing.als"

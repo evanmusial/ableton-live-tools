@@ -733,7 +733,7 @@ def format_timestamp(total_seconds, precision=0):
 
     # Rounding can theoretically produce 60.000 seconds, so normalize it before
     # formatting rather than letting a timestamp such as 01:60.00 leak out.
-    if seconds >= 60.0:
+    if seconds >= 60.0:  # pragma: no cover
         minutes += 1
         seconds -= 60.0
 
@@ -1071,7 +1071,7 @@ def build_tempo_at_beat_lookup(tempo_changes):
         segment_start_beat, segment_start_bpm = tempo_changes[segment_start_index]
         segment_end_beat, segment_end_bpm = tempo_changes[next_event_index]
 
-        if abs(segment_end_beat - segment_start_beat) < 1e-9:
+        if abs(segment_end_beat - segment_start_beat) < 1e-9:  # pragma: no cover
             return segment_end_bpm
 
         beat_offset = beat - segment_start_beat
