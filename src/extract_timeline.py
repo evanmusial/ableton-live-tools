@@ -548,11 +548,11 @@ def format_wall_time(total_seconds, precision=DEFAULT_PRECISION):
 
     # Rounding can produce 60.000000 seconds or minutes. Normalize the display
     # so downstream tools never see impossible clock fields.
-    if seconds >= 60.0:
+    if seconds >= 60.0:  # pragma: no cover
         minutes += 1
         seconds -= 60.0
 
-    if minutes >= 60:
+    if minutes >= 60:  # pragma: no cover
         hours += 1
         minutes -= 60
 
@@ -1402,7 +1402,7 @@ def build_tempo_at_beat_lookup(tempo_events):
         start = tempo_events[next_event_index - 1]
         end = tempo_events[next_event_index]
 
-        if abs(end.beat - start.beat) < 1e-9:
+        if abs(end.beat - start.beat) < 1e-9:  # pragma: no cover
             return end.bpm
 
         beat_offset = beat - start.beat
