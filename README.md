@@ -16,9 +16,9 @@ large Ableton Live sets.
 
 ## Current Release
 
-Version `2026.09.03` is tested and validated for Ableton Live 12.4.5. The
+Version `2026.09.17` is tested and validated for Ableton Live 12.4.6. The
 compatibility suite exercises all six CLIs against the canonical project fixture
-with Live 12.4.5 creator metadata.
+with Live 12.4.6 creator metadata.
 
 ## Points Of Interest
 
@@ -71,7 +71,7 @@ with Live 12.4.5 creator metadata.
 
 ## Testing
 
-- [Tests](tests/README.md): Run `python3 -m unittest discover -s tests` from the repository root to validate the CLI tools against the canonical Ableton Live fixture set, including the Ableton Live 12.4.5 compatibility pass and 100% source coverage checks.
+- [Tests](tests/README.md): Run `python3 -m unittest discover -s tests` from the repository root to validate the CLI tools against the canonical Ableton Live fixture set, including the Ableton Live 12.4.6 compatibility pass and 100% source coverage checks.
 - [Validation Benchmark](scripts/benchmark_validation.py): Run `python3 scripts/benchmark_validation.py --compare-ref=main` to measure current CLI performance against another git ref.
 
 ## License

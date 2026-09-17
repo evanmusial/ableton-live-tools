@@ -619,7 +619,11 @@ class CliValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            for creator_version in ("Ableton Live 12.4.3", "Ableton Live 12.4.5"):
+            for creator_version in (
+                "Ableton Live 12.4.3",
+                "Ableton Live 12.4.5",
+                "Ableton Live 12.4.6",
+            ):
                 with self.subTest(creator_version=creator_version):
                     version_slug = creator_version.rsplit(" ", 1)[-1]
                     als_path = temp_path / f"RYM_2026-03_Ableton_{version_slug}.als"

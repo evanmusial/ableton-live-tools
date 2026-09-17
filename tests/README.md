@@ -39,7 +39,7 @@ The first test layer focuses on stable user-visible behavior:
 - `diff_als_semantic.py` Markdown and JSON output for an identical-file no-change comparison plus a locator-name change comparison.
 - `audit_project.py` bundled audit output, manifest/health reuse metadata, optional same-file semantic diff output, and expected fixture counts.
 - Unified asset enumeration, preset-reference health findings, and streamed Live 12 Main/PreHear asset coverage.
-- Ableton Live 12.4.3 and 12.4.5 compatibility across all six CLIs using the canonical project fixture with rewritten creator metadata.
+- Ableton Live 12.4.3, 12.4.5, and 12.4.6 compatibility across all six CLIs using the canonical project fixture with rewritten creator metadata.
 - Missing input files returning error exit code `1`.
 - Command-line argument errors returning exit code `2`.
 
