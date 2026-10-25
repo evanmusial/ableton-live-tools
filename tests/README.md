@@ -38,6 +38,7 @@ The first test layer focuses on stable user-visible behavior:
 - `check_project_health.py` Markdown and JSON report output plus expected missing-sample findings and failure-threshold behavior.
 - `diff_als_semantic.py` Markdown and JSON output for an identical-file no-change comparison plus a locator-name change comparison.
 - `audit_project.py` bundled audit output, manifest/health reuse metadata, optional same-file semantic diff output, and expected fixture counts.
+- `extract_plugin_inventory.py` synthetic scan/browser databases, external-only identity joins, Live tag hierarchy, AU component metadata, ambiguous paths, disabled entries, WAL reads and temporary-copy fallback, private search-tokenizer isolation, source protection, and text/JSON/CSV/TSV CLI exports. These are schema fixtures, separate from installed-Live compatibility qualification.
 - Unified asset enumeration, preset-reference health findings, and streamed Live 12 Main/PreHear asset coverage.
 - Ableton Live 12.4.3, 12.4.5, and 12.4.6 compatibility across all six CLIs using the canonical project fixture with rewritten creator metadata.
 - Missing input files returning error exit code `1`.

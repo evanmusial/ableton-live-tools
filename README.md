@@ -1,5 +1,5 @@
 Ableton Live Tools is a small Python toolkit for reading Ableton Live `.als`
-session files and turning useful arrangement data into practical exports for
+session files and local plug-in databases, turning useful data into practical exports for
 DJs, producers, editors, archivists, and automation workflows. It focuses on
 things Ableton users often need outside Live itself: locator tracklists,
 tempo-aware timeline data, Mixcloud-compatible tracklists, Adobe Audition marker
@@ -33,6 +33,8 @@ with Live 12.4.6 creator metadata.
   optional bar/beat grids.
 - Build project inventories with tracks, clips, samples, native devices,
   third-party plugins, plugin/effect authors, and missing-sample status.
+- Export AU, VST, and VST3 plug-ins known to Live with recorded versions, module
+  paths, and original browser category/tag hierarchies.
 - Enumerate file-backed assets—including samples, preset files, Max for Live
   devices, and other media references—with usage, location, and portability
   status in `assets.tsv` and JSON.
@@ -50,6 +52,8 @@ with Live 12.4.6 creator metadata.
   performance against another git ref.
 
 ## Tools Collection
+
+- [Plug-in Inventory](<docs/Plugin Inventory.md>): `src/extract_plugin_inventory.py` reads Live's local scan cache and browser index to export external plug-ins as formatted text, JSON, CSV, or TSV. It preserves Live's tag hierarchy and raw scanner subcategories, resolves AU component paths where possible, and reports unknown versions/paths explicitly. See its database compatibility limits separately from the released session-file tools.
 
 - [Extract Locators](<docs/Extract Locators.md>): `src/extract_locators.py` extracts Ableton Live arrangement locators from `.als` session files and writes timestamped tracklists. It supports tempo changes, linear tempo ramps, offsets, TSV exports, CSV exports, Mixcloud exports, Adobe Audition marker exports, REAPER marker CSV exports, Logic Pro/Pro Tools/Cubase/Nuendo MIDI marker-map presets, WebVTT chapter exports, CUE sheet exports, Markdown reports, Standard MIDI marker exports with optional tempo/time-signature timing maps, JSON exports, optional key stripping, configurable TSV/CSV heading rows, and optional locator metadata columns.
 
@@ -71,7 +75,7 @@ with Live 12.4.6 creator metadata.
 
 ## Testing
 
-- [Tests](tests/README.md): Run `python3 -m unittest discover -s tests` from the repository root to validate the CLI tools against the canonical Ableton Live fixture set, including the Ableton Live 12.4.6 compatibility pass and 100% source coverage checks.
+- [Tests](tests/README.md): Run `python3 -m unittest discover -s tests` from the repository root to validate the session-file CLI tools against the canonical Ableton Live fixture set, including the Ableton Live 12.4.6 compatibility pass, and the plug-in inventory against synthetic database fixtures. Coverage checks are a separate workflow described in the test documentation.
 - [Validation Benchmark](scripts/benchmark_validation.py): Run `python3 scripts/benchmark_validation.py --compare-ref=main` to measure current CLI performance against another git ref.
 
 ## License
