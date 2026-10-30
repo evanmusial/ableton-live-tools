@@ -623,6 +623,7 @@ class CliValidationTests(unittest.TestCase):
                 "Ableton Live 12.4.3",
                 "Ableton Live 12.4.5",
                 "Ableton Live 12.4.6",
+                "Ableton Live 12.4.7",
             ):
                 with self.subTest(creator_version=creator_version):
                     version_slug = creator_version.rsplit(" ", 1)[-1]
